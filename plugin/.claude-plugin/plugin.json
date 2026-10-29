@@ -1,0 +1,9 @@
+{
+  "name": "smidja",
+  "version": "0.1.0",
+  "description": "Personal skills, commands and agents, plus the /afl workflow skill.",
+  "author": {
+    "name": "Chris Webber",
+    "email": "chris@awebberhome.com"
+  }
+}

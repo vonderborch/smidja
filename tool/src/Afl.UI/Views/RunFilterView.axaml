@@ -1,0 +1,36 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dc="using:Afl.UI.DataContexts"
+             x:Class="Afl.UI.Views.RunFilterView"
+             x:DataType="dc:RunFilterDataContext">
+    <StackPanel Spacing="6">
+        <!-- Search: every word must be found in the run -->
+        <TextBox x:Name="SearchBox" Text="{Binding SearchText}" PlaceholderText="Search runs: title, ticket, id, tag, folder…"
+                 KeyDown="OnSearchKeyDown" ToolTip.Tip="Every word must be found in the run's title, ticket, id, tags, folder, workflow, repo, agent or state">
+            <TextBox.InnerRightContent>
+                <Button Classes="toggle" Content="✕" Padding="6,0" Click="OnClearSearch" FontSize="11"
+                        IsVisible="{Binding SearchText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                        ToolTip.Tip="Clear the search" />
+            </TextBox.InnerRightContent>
+        </TextBox>
+
+        <!-- States: click one to show only runs in it (and the others picked) -->
+        <ItemsControl ItemsSource="{Binding States}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel ItemSpacing="4" LineSpacing="4" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="dc:RunStateChoiceDataContext">
+                    <Button Classes="tag state" Classes.picked="{Binding IsPicked}" Click="OnToggleState" IsVisible="{Binding IsVisible}"
+                            ToolTip.Tip="{Binding Info.Description}">
+                        <StackPanel Orientation="Horizontal" Spacing="4">
+                            <TextBlock Classes="state" Text="{Binding Info.Symbol}"
+                                       Foreground="{Binding State, Converter={x:Static dc:UiConverters.StateBrush}}" />
+                            <TextBlock Text="{Binding Text}" />
+                        </StackPanel>
+                    </Button>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

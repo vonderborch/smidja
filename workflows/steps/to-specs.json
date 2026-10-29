@@ -1,0 +1,43 @@
+{
+  "$schema": "./common-step.schema.json",
+  "schemaVersion": "2.0",
+  "id": "to-specs",
+  "name": "Turn into specs",
+  "description": "Drafts or revises SPECS.md from the intent, the research and any spike and prototype findings in the scratch directory: what will be built, how, and how we'll know it's done. Set extra for what this pass is for. Asks you when something it needs isn't written down anywhere.",
+  "tags": [
+    "planning",
+    "specs"
+  ],
+  "parameters": [
+    {
+      "id": "work",
+      "label": "What kind of work this is",
+      "description": "How the prompts name the work, e.g. \"feature\" or \"bug fix\".",
+      "default": "feature"
+    },
+    {
+      "id": "extra",
+      "label": "What this pass is for",
+      "description": "Guidance for this pass, e.g. a first draft that marks unknowns, or the final version built on the spikes' findings.",
+      "default": ""
+    }
+  ],
+  "step": {
+    "id": "specs",
+    "name": "Write the specs",
+    "type": "ai",
+    "ask": true,
+    "permissionMode": "default",
+    "allowedTools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git status:*)",
+      "Bash(ls:*)"
+    ],
+    "artifact": "{{scratch.dir}}/SPECS.md",
+    "prompt": "Write the specs for this {{params.work}}: {{ticket.title}}.\n\nRead, in {{scratch.path}}:\n- INTENT.md: what is wanted (the goal, definition of done, constraints, acceptance criteria).\n- RESEARCH.md: how things work today and what likely changes.\n- FINDINGS.md and any *_REPORT.md from spikes and prototypes: what they found. When there are any, the specs must follow what they learned, and must not rely on a prototype a person rejected.\n- SPECS.md, if it exists: an earlier draft to revise rather than start over.\n\nRead code as far as you need to be concrete. Do not change any files. Ask about anything the specs need that none of these settle.\n\n{{params.extra}}\n\nReply with SPECS.md, in markdown, and nothing else:\n\n# Specs: {{ticket.title}}\n## Goal\n## Out of scope\n## Behaviour\n(what will be true when this is done, precise enough to test)\n## Design\n(the approach, by module or file, and why)\n## Data and interfaces\n(types, formats, APIs, config that change)\n## Error handling and edge cases\n## Testing\n## Acceptance criteria\n(numbered, each checkable)\n## Risks and open questions"
+  }
+}

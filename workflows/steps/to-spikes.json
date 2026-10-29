@@ -1,0 +1,41 @@
+{
+  "$schema": "./common-step.schema.json",
+  "schemaVersion": "2.0",
+  "id": "to-spikes",
+  "name": "Identify spikes and prototypes",
+  "description": "Reads the draft specs (or whichever document brief names) and decides what must be found out before they can be final: research spikes (questions answered by reading docs, code or the web) and prototypes (throwaway code that tries something out). Writes a ticket file for each and lists them on machine-read Spikes: and Prototypes: lines, or replies NONE when nothing is left to find out.",
+  "tags": [
+    "planning",
+    "spikes"
+  ],
+  "parameters": [
+    {
+      "id": "work",
+      "label": "What kind of work this is",
+      "description": "How the prompts name the work, e.g. \"feature\" or \"bug fix\".",
+      "default": "feature"
+    },
+    {
+      "id": "brief",
+      "label": "The document the spikes serve",
+      "description": "The file in the scratch directory that the spikes and prototypes settle questions for, e.g. SPECS.md (the draft specs) or OPTIONS.md (architecture options).",
+      "default": "SPECS.md"
+    },
+    {
+      "id": "extra",
+      "label": "Anything else to look for",
+      "description": "Extra guidance on what counts as a spike or prototype, e.g. reproductions for a bug.",
+      "default": ""
+    }
+  ],
+  "step": {
+    "id": "identify",
+    "name": "Identify spikes and prototypes",
+    "type": "ai",
+    "advance": "approve",
+    "ask": true,
+    "permissionMode": "acceptEdits",
+    "artifact": "{{scratch.dir}}/SPIKES.md",
+    "prompt": "Decide what we still have to find out before {{params.brief}} for this {{params.work}} ({{ticket.title}}) can be final.\n\nRead, in {{scratch.path}}: {{params.brief}} (the draft the spikes serve), the intent and research behind it (INTENT.md, RESEARCH.md), any FINDINGS.md from an earlier round, and every spike-*.md and prototype-*.md ticket with its _REPORT.md. Change nothing outside {{scratch.path}}.\n\nLook for unknowns that would change the design or the tickets: open questions, risky assumptions, choices between approaches, things nobody has checked work. For each one, pick the cheapest way to settle it:\n- a spike: a question answered by research (reading docs, code, issues or the web) without writing code.\n- a prototype: throwaway code that tries something out (an approach, a library, an API, performance) on its own branch; a person tries it and approves it before we rely on it.\nSkip anything {{params.brief}} can just decide, and anything an earlier spike or prototype already answered (it has a _REPORT.md). Ask the user when you can't tell whether something matters.\n{{params.extra}}\n\nWrite each one to {{scratch.path}}/<kind>-NNN-<name>.md, where <kind> is spike or prototype, NNN carries on the three-digit sequence across both kinds after any existing files, and <name> is a few lowercase words joined by dashes. Each has: # title, ## Question (what we need to know, and why it matters to {{params.brief}}), ## How to find out, ## Done when (what the report must answer), ## Notes (files, docs, links).\n\nThen reply with SPIKES.md, in markdown, and nothing else. It must start with these machine-read lines, each written as its file name without .md, and nothing else on the line:\nSpikes: <spike ids, comma-separated>   (leave this line out when there are none)\nPrototypes: <prototype ids, comma-separated>   (leave this line out when there are none)\nIf there is nothing left to find out, the first line is exactly NONE instead.\nAfter those lines, add ## Why, saying what each one settles."
+  }
+}

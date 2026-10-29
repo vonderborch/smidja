@@ -1,0 +1,12 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.1",
+  "id": "test-first",
+  "name": "Test first",
+  "description": "Write the failing test before the change, preferring integration tests that exercise real behaviour (with Gherkin scenarios where the repo uses them), backed by unit tests for tricky logic. Use for any step that changes code.",
+  "tags": [
+    "testing",
+    "quality"
+  ],
+  "content": "# Test first\n\nProve the change with a test that fails before it and passes after.\n\n## Order of work\n\n1. Find how the repo tests today (test projects, `tests/`, `features/`, CI config) and follow it.\n2. Write the test for the behaviour asked for. Run it and see it **fail for the right reason**.\n3. Make the smallest change that passes it. Run the test again.\n4. Refactor with the tests green. Run the whole suite before you finish.\n\n## Which kind of test\n\n- **Prefer integration tests**: drive the feature through its real entry point (HTTP endpoint, CLI command, public API, page) with real collaborators where practical: a real database in a container or temp file, a real file system in a temp dir, the real serializer.\n- Fake only what you can't run locally or deterministically: third-party services, the clock, randomness, payment and email providers.\n- **Add unit tests** for logic with many cases (parsing, rules, calculations), where an integration test per case would be slow or vague.\n- If the repo has Gherkin `.feature` files (Reqnroll, SpecFlow, pytest-bdd, behave, Cucumber), write the behaviour as a scenario there; see the `bdd-scenarios` skill.\n\n## Good tests\n\n- One behaviour per test, named for it: `Checkout_FailsWhenCardIsDeclined`, `test_checkout_fails_when_card_is_declined`.\n- Arrange, act, assert, visibly separated. Assert on outcomes people care about, not on internal calls.\n- Independent: no shared mutable state, no order dependence, temp dirs and unique ids per test.\n- Deterministic: no sleeps to wait for work; wait on a condition with a timeout.\n- A bug fix starts with a test that reproduces the bug.\n\n## Do not\n\n- Change or delete a test just to make it pass; if the test is wrong, say why.\n- Mark tests skipped to get green.\n- Leave the suite slower or flakier than you found it.\n"
+}

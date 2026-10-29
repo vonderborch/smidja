@@ -1,0 +1,54 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dc="using:Afl.UI.DataContexts"
+             xmlns:repos="using:Afl.Core.Repos"
+             xmlns:pages="using:Afl.UI.Pages"
+             xmlns:niddy="https://github.com/vonderborch/Niddy"
+             x:Class="Afl.UI.Views.ShellLayout"
+             x:DataType="dc:ShellDataContext">
+
+    <Grid ColumnDefinitions="230,*">
+
+        <!-- Sidebar: the repo picker, the page menu, then adding repos and the global settings -->
+        <Border Grid.Column="0" Background="{DynamicResource SystemControlBackgroundBaseLowBrush}" Padding="8,12">
+            <DockPanel>
+                <TextBlock DockPanel.Dock="Top" Text="afl" FontSize="22" FontWeight="Bold" Margin="8,0,0,12" />
+
+                <DockPanel DockPanel.Dock="Top" Margin="4,0,4,12">
+                    <Button x:Name="RepoSettingsButton" DockPanel.Dock="Right" Margin="6,0,0,0" Padding="8"
+                            VerticalAlignment="Stretch" Click="OnRepoSettings"
+                            ToolTip.Tip="Settings for this repo"
+                            IsEnabled="{Binding SelectedRepo, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <PathIcon Width="16" Height="16" Data="{x:Static pages:PageIcons.SettingsGeometry}" />
+                    </Button>
+                    <ComboBox x:Name="RepoPicker" ItemsSource="{Binding RepoItems}" SelectedItem="{Binding SelectedRepoItem}"
+                              HorizontalAlignment="Stretch">
+                        <ComboBox.ItemTemplate>
+                            <DataTemplate x:DataType="repos:RepoRecord">
+                                <StackPanel ToolTip.Tip="{Binding Path}">
+                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Classes="meta" Text="{Binding Host.Project}" TextTrimming="CharacterEllipsis"
+                                               IsVisible="{Binding Host.Project, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                </StackPanel>
+                            </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                    </ComboBox>
+                </DockPanel>
+
+                <StackPanel DockPanel.Dock="Bottom" Spacing="6" Margin="4,8,4,0">
+                    <Button Content="Add repo…" HorizontalAlignment="Stretch" Click="OnAddRepo" />
+                    <Button HorizontalAlignment="Stretch" Click="OnSettings" ToolTip.Tip="Jira instances (Cmd/Ctrl+,)">
+                        <StackPanel Orientation="Horizontal" Spacing="6">
+                            <PathIcon Width="14" Height="14" Data="{x:Static pages:PageIcons.SettingsGeometry}" />
+                            <TextBlock Text="Settings" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <niddy:PageMenu x:Name="Menu" Style="VerticalStrip" NarrowStyle="{x:Null}" />
+            </DockPanel>
+        </Border>
+
+        <ContentControl x:Name="PageHost" Grid.Column="1" Margin="12" />
+    </Grid>
+</UserControl>

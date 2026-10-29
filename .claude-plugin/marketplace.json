@@ -1,0 +1,17 @@
+{
+  "name": "smidja",
+  "owner": {
+    "name": "Chris Webber",
+    "email": "chris@awebberhome.com"
+  },
+  "metadata": {
+    "description": "Chris's Claude Code skills, commands, agents and the Afl workflow tool."
+  },
+  "plugins": [
+    {
+      "name": "smidja",
+      "source": "./plugin",
+      "description": "Personal skills, commands and agents, plus the /afl workflow skill."
+    }
+  ]
+}

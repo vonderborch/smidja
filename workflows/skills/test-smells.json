@@ -1,0 +1,14 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.1",
+  "id": "test-smells",
+  "name": "Test smells",
+  "description": "Audit a test suite for tests that can't fail or fail for the wrong reasons: missing or weak assertions, swallowed exceptions, sleeps and order dependence, over-mocking, duplication and magic values. Produces a ranked report with a fix for each finding. Use for test review steps in .NET or Python.",
+  "tags": [
+    "testing",
+    "review",
+    "dotnet",
+    "python"
+  ],
+  "content": "# Test smells\n\nRead the tests the way a skeptic would: for each one, ask \"what bug would make this fail?\" If the answer is \"none\", it's a smell.\n\n## What to look for, worst first\n\n1. **Can't fail.** No assertion; asserting only that no exception was thrown; `Assert.True(true)`; asserting on the value the test just set; an assertion inside a loop over a collection that may be empty; an `async` test that never awaits the thing it checks.\n2. **Hides failures.** `try`/`catch` around the code under test that swallows or logs the exception; `except Exception: pass`; catching the base exception type in `Assert.Throws`/`pytest.raises` so any error passes.\n3. **Flaky.** `Thread.Sleep`/`Task.Delay`/`time.sleep` to wait for work; real clocks, time zones or `DateTime.Now`; random data without a fixed seed; depending on test order or on state another test left behind (static fields, shared files, a shared database row); network calls to real external services.\n4. **Tests the mock, not the code.** Every collaborator mocked so the test only checks that the code calls its mocks in the expected order. Prefer an integration test with real collaborators (see `test-first`, `testcontainers`), and keep fakes for genuinely external services.\n5. **Pins the implementation.** Asserting on private details, exact log text or call counts that don't matter to users, so harmless refactors break the test.\n6. **Hard to read.** Magic numbers and strings with no name; huge arrange sections that could be a builder or fixture; several unrelated behaviours in one test; names like `Test1` instead of the behaviour (`Cancel_RefundsTheDeposit`).\n7. **Duplicated.** Copies of the same test with one value changed. Use a theory/`[InlineData]` or `@pytest.mark.parametrize`, or a Gherkin scenario outline (see `bdd-scenarios`).\n\n## The report\n\n- Group findings by severity (**high**: can't fail or hides failures; **medium**: flaky or tests the mock; **low**: readability and duplication).\n- Each finding: file and line, the smell, one sentence on the bug it lets through, and the concrete fix.\n- End with the few changes that would most improve trust in the suite.\n- Don't edit the tests in a review step unless the step asks you to.\n"
+}

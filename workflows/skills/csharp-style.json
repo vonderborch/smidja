@@ -1,0 +1,30 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.2",
+  "id": "csharp-style",
+  "name": "C# style",
+  "description": "C# and .NET conventions: nullable on, zero warnings, file-scoped namespaces, explicit this., XML docs on members, and extensible designs built on generic and abstract base classes. Use when writing or changing C# code.",
+  "tags": [
+    "csharp",
+    "dotnet",
+    "style"
+  ],
+  "recommend": {
+    "files": [
+      {
+        "glob": "*.csproj"
+      },
+      {
+        "glob": "*.sln"
+      },
+      {
+        "glob": "*.slnx"
+      }
+    ],
+    "languages": [
+      "csharp"
+    ],
+    "reason": "C# project"
+  },
+  "content": "# C# style\n\nMatch the code around you first; these are the defaults when the repo doesn't say otherwise.\n\n## Language and build\n\n- `<Nullable>enable</Nullable>`; no `!` to silence a warning without a reason in a comment.\n- Leave the build at **0 warnings**. Fix analyzer warnings rather than suppressing them; a suppression needs a justification.\n- File-scoped namespaces, one top-level type per file named after it.\n- Always braces, even for one-line bodies. `this.` on instance members.\n- Private fields `_camelCase`; everything else PascalCase; constants in a constants class rather than magic strings.\n- XML docs (`<summary>`, `<param>`, `<returns>`) on every member, including private ones; say what it's for, not how.\n- Prefer `var` when the type is obvious; collection expressions (`[]`, `[.. items]`); pattern matching over casts; `required`/`init` for data objects.\n\n## Design\n\n- Build extension points as **generic and abstract base classes** that hold the shared behaviour, with small focused overrides in subclasses. Prefer them over interfaces plus many tiny classes that barely do anything.\n- Register implementations (attributes plus a registry or DI) rather than `switch`ing on a type or kind string.\n- Keep classes cohesive; split by responsibility, not by line count.\n- Immutable where practical; avoid static mutable state.\n- Exceptions for exceptional cases, with messages that say what to do; don't use them for control flow.\n\n## Tests\n\n- xUnit by default; integration tests over real collaborators where practical (temp dirs, test containers), unit tests for dense logic.\n- Test names: `Subject_DoesX_WhenY`.\n"
+}

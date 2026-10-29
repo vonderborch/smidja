@@ -1,0 +1,222 @@
+<niddy:Page xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:niddy="https://github.com/vonderborch/Niddy"
+            xmlns:dc="using:Afl.UI.DataContexts"
+            xmlns:views="using:Afl.UI.Views"
+            xmlns:jira="using:Afl.Core.Jira"
+            x:Class="Afl.UI.Pages.RepoSettingsPage"
+            x:DataType="dc:RepoSettingsPageDataContext">
+
+    <Panel>
+        <TextBlock Text="{Binding NoRepoMessage}" Classes="hint" HorizontalAlignment="Center" VerticalAlignment="Center"
+                   IsVisible="{Binding !HasRepo}" />
+
+        <ScrollViewer IsVisible="{Binding HasRepo}">
+            <StackPanel Spacing="12" MaxWidth="1100" HorizontalAlignment="Left">
+
+                <TextBlock Classes="h1" Text="{Binding Repo.Name, StringFormat='{}{0} settings'}" />
+                <TextBlock Classes="error" Text="{Binding ErrorMessage}" TextWrapping="Wrap"
+                           IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+                <!-- General -->
+                <Border Classes="card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="h2" Text="General" />
+                        <Grid ColumnDefinitions="*,*" RowDefinitions="Auto,Auto">
+                            <HeaderedContentControl Grid.Row="0" Grid.Column="0" Header="Name" Margin="0,0,12,0">
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Content="Rename" Margin="6,0,0,0" Click="OnSaveName" />
+                                    <TextBox Text="{Binding RepoName}" />
+                                </DockPanel>
+                            </HeaderedContentControl>
+                            <HeaderedContentControl Grid.Row="0" Grid.Column="1" Header="Default workflow">
+                                <ComboBox ItemsSource="{Binding WorkflowIds}" SelectedItem="{Binding DefaultWorkflowId}"
+                                          HorizontalAlignment="Stretch" />
+                            </HeaderedContentControl>
+                            <HeaderedContentControl Grid.Row="1" Grid.Column="0" Header="Path" Margin="0,6,12,0">
+                                <SelectableTextBlock Text="{Binding Repo.Path}" TextWrapping="Wrap" />
+                            </HeaderedContentControl>
+                        </Grid>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Remove repo…" Click="OnRemoveRepo" />
+                            <TextBlock Classes="hint" VerticalAlignment="Center"
+                                       Text="Stops tracking it. Its runs and files are kept." />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- GitHub / GitLab -->
+                <Border Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Classes="h2" Text="Issues from GitHub / GitLab" />
+                        <SelectableTextBlock Text="{Binding HostLinkText}" TextWrapping="Wrap" />
+                        <TextBlock Classes="meta" TextWrapping="Wrap" Text="{Binding HostStatus}"
+                                   IsVisible="{Binding HostStatus, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <HeaderedContentControl Header="Site">
+                                <ComboBox ItemsSource="{Binding HostChoices}" SelectedItem="{Binding HostConnectionId}" MinWidth="160" />
+                            </HeaderedContentControl>
+                            <HeaderedContentControl Header="Project">
+                                <TextBox Text="{Binding HostProject}" Width="320"
+                                         PlaceholderText="owner/repo, group/sub/project or its web address" />
+                            </HeaderedContentControl>
+                            <Button Content="Save" VerticalAlignment="Bottom" Click="OnSaveHostLink" />
+                            <Button Content="Unlink" VerticalAlignment="Bottom" Click="OnUnlinkHost"
+                                    IsVisible="{Binding IsHostLinked}" />
+                            <Button Content="Detect from remotes" VerticalAlignment="Bottom" Click="OnDetectHost" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Jira -->
+                <Border Classes="card">
+                    <StackPanel Spacing="10">
+                        <TextBlock Classes="h2" Text="Jira" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <HeaderedContentControl Header="Instance">
+                                <ComboBox ItemsSource="{Binding LinkChoices}" SelectedItem="{Binding LinkedInstance}" MinWidth="200" />
+                            </HeaderedContentControl>
+                            <Button Content="Refresh from Jira" VerticalAlignment="Bottom" Click="OnLoadFromJira"
+                                    IsVisible="{Binding IsLinked}" IsEnabled="{Binding !IsLoadingJira}" />
+                            <ProgressBar IsIndeterminate="True" Width="80" VerticalAlignment="Bottom" Margin="0,0,0,10"
+                                         IsVisible="{Binding IsLoadingJira}" />
+                        </StackPanel>
+                        <TextBlock Classes="hint" TextWrapping="Wrap" IsVisible="{Binding !IsLinked}"
+                                   Text="Link an instance to list this repo's Jira tickets. Instances are added in Settings, at the bottom of the sidebar." />
+                        <TextBlock Classes="meta" TextWrapping="Wrap" Text="{Binding JiraStatus}" IsVisible="{Binding IsLinked}" />
+
+                        <!-- Projects -->
+                        <StackPanel Spacing="6" IsVisible="{Binding IsLinked}">
+                            <TextBlock Classes="h2" Text="Projects" />
+                            <TextBlock Classes="hint" TextWrapping="Wrap"
+                                       Text="Tickets from these projects belong in this repo. Jira listings that don't pick a project or board are limited to them, and their ticket keys find this repo. Pick none for any project." />
+                            <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1"
+                                    CornerRadius="4" MaxHeight="220" MaxWidth="640" HorizontalAlignment="Left">
+                                <ScrollViewer>
+                                    <ItemsControl ItemsSource="{Binding ProjectChoices}" Margin="8,4">
+                                        <ItemsControl.ItemsPanel>
+                                            <ItemsPanelTemplate>
+                                                <WrapPanel ItemSpacing="16" />
+                                            </ItemsPanelTemplate>
+                                        </ItemsControl.ItemsPanel>
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate x:DataType="{x:Type dc:SelectableItem, x:TypeArguments=x:String}">
+                                                <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" MinWidth="180" />
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Border>
+                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                <TextBox Text="{Binding NewProjectKey}" PlaceholderText="Type a key, e.g. APP" MinWidth="200" />
+                                <Button Content="Add" Click="OnAddProject" />
+                                <Button Classes="accent" Content="Save projects" Click="OnSaveProjects" />
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Saved filters -->
+                        <StackPanel Spacing="6" IsVisible="{Binding IsLinked}">
+                            <TextBlock Classes="h2" Text="Filters" />
+                            <TextBlock Classes="hint" TextWrapping="Wrap"
+                                       Text="Fields are combined with AND. The default filter is used when listing Jira tickets without choosing one." />
+                            <Grid ColumnDefinitions="240,*">
+                                <DockPanel Grid.Column="0" Margin="0,0,12,0">
+                                    <TextBlock DockPanel.Dock="Bottom" Classes="meta" Margin="0,4,0,0"
+                                               Text="{Binding DefaultFilter, StringFormat='Default: {0}', TargetNullValue='No default filter'}" />
+                                    <WrapPanel DockPanel.Dock="Bottom" ItemSpacing="6" LineSpacing="6" Margin="0,6,0,0">
+                                        <Button Content="New" Click="OnNewFilter" />
+                                        <Button Content="Make default" Click="OnMakeDefaultFilter"
+                                                IsEnabled="{Binding SelectedFilter, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                        <Button Content="No default" Click="OnClearDefaultFilter"
+                                                IsEnabled="{Binding DefaultFilter, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                        <Button Content="Remove…" Click="OnRemoveFilter"
+                                                IsEnabled="{Binding SelectedFilter, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                    </WrapPanel>
+                                    <ListBox views:RowMenus.IsEnabled="True" ItemsSource="{Binding Filters}" SelectedItem="{Binding SelectedFilter}" MinHeight="120">
+                                        <ListBox.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Make default" Click="OnMakeDefaultFilter" />
+                                                <MenuItem Header="No default" Click="OnClearDefaultFilter" IsEnabled="{Binding DefaultFilter, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                                <Separator />
+                                                <MenuItem Header="Remove…" Click="OnRemoveFilter" />
+                                            </ContextMenu>
+                                        </ListBox.ContextMenu>
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate x:DataType="jira:JiraFilter">
+                                                <TextBlock Text="{Binding Name}" />
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </DockPanel>
+
+                                <StackPanel Grid.Column="1" Spacing="6">
+                                    <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto,Auto">
+                                        <HeaderedContentControl Grid.Row="0" Grid.Column="0" Header="Name" Margin="0,0,6,0">
+                                            <TextBox Text="{Binding FilterName}" PlaceholderText="mine" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Grid.Row="0" Grid.Column="1" Header="Project" Margin="0,0,6,0">
+                                            <AutoCompleteBox Text="{Binding FilterProject}" ItemsSource="{Binding ProjectKeys}"
+                                                             MinimumPrefixLength="0" FilterMode="StartsWith" PlaceholderText="Any project" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Grid.Row="0" Grid.Column="2" Header="Board">
+                                            <AutoCompleteBox Text="{Binding FilterBoard}" ItemsSource="{Binding BoardChoices}"
+                                                             MinimumPrefixLength="0" FilterMode="Contains" PlaceholderText="Any board, or an id" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Grid.Row="1" Grid.Column="0" Header="Assignee" Margin="0,6,6,0">
+                                            <AutoCompleteBox Text="{Binding FilterAssignee}" ItemsSource="{Binding AssigneeChoices}"
+                                                             MinimumPrefixLength="0" FilterMode="StartsWith" PlaceholderText="Anyone" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Grid.Row="1" Grid.Column="1" Header="Team (Cloud)" Margin="0,6,6,0">
+                                            <TextBox Text="{Binding FilterTeam}" PlaceholderText="Team name or id" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Grid.Row="1" Grid.Column="2" Header="Statuses" Margin="0,6,0,0">
+                                            <TextBox Text="{Binding FilterStatuses}" PlaceholderText="To Do, In Progress" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Grid.Row="2" Grid.Column="0" Header="Labels" Margin="0,6,6,0">
+                                            <TextBox Text="{Binding FilterLabels}" PlaceholderText="backend, api" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Header="Extra JQL"
+                                                                Margin="0,6,0,0">
+                                            <TextBox Text="{Binding FilterJql}" PlaceholderText="priority = High" />
+                                        </HeaderedContentControl>
+                                    </Grid>
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <CheckBox Content="Make this the default" IsChecked="{Binding FilterMakeDefault}" />
+                                        <Button Classes="accent" Content="Save filter" Click="OnSaveFilter" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- Project -->
+                <Border Classes="card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="h2" Text="Project" />
+                        <TextBlock Classes="hint" TextWrapping="Wrap"
+                                   Text="What this repo is built with. Skills are recommended from it as well as from the repo's files, which is all there is to go on while the repo is still empty." />
+                        <ContentControl Content="{Binding Stack}" MaxWidth="560" HorizontalAlignment="Left">
+                            <ContentControl.ContentTemplate>
+                                <DataTemplate x:DataType="dc:StackDataContext">
+                                    <views:StackView />
+                                </DataTemplate>
+                            </ContentControl.ContentTemplate>
+                        </ContentControl>
+                        <Button Content="Save project info" Click="OnSaveStack" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Permissions -->
+                <Border Classes="card">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="h2" Text="Permissions" />
+                        <TextBlock Classes="hint" TextWrapping="Wrap"
+                                   Text="Rules for every run in this repo, on top of the ones for every repo and the guard rails in Settings → Permissions. Always allow on a run saves here by default." />
+                        <views:PermissionRulesView DataContext="{Binding PermissionRules}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </ScrollViewer>
+    </Panel>
+</niddy:Page>

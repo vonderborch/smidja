@@ -1,0 +1,34 @@
+{
+  "$schema": "./common-step.schema.json",
+  "schemaVersion": "2.0",
+  "id": "to-tickets",
+  "name": "Split into tickets",
+  "description": "Splits the final SPECS.md into work tickets in the scratch directory, one file each, named <kind>-NNN-<name>.md with one three-digit sequence across kinds, then writes TICKET_ORDER.md: the waves of tickets that can be worked on in parallel. Waits for your approval.",
+  "tags": [
+    "planning",
+    "tickets"
+  ],
+  "parameters": [
+    {
+      "id": "work",
+      "label": "What kind of work this is",
+      "description": "How the prompts name the work, e.g. \"feature\" or \"bug fix\".",
+      "default": "feature"
+    },
+    {
+      "id": "kinds",
+      "label": "Ticket kinds",
+      "description": "The kinds a ticket can be. Spikes and prototypes are not tickets here: they ran before the specs were final.",
+      "default": "feature, bug, chore"
+    }
+  ],
+  "step": {
+    "id": "tickets",
+    "name": "Split into tickets",
+    "type": "ai",
+    "advance": "approve",
+    "permissionMode": "acceptEdits",
+    "artifact": "{{scratch.dir}}/TICKET_ORDER.md",
+    "prompt": "Split the specs for this {{params.work}} ({{ticket.title}}) into work tickets.\n\nRead {{scratch.path}}/SPECS.md (and INTENT.md, RESEARCH.md and FINDINGS.md beside it; an accepted prototype's branch shows an approach that works, but build the real thing properly). Change nothing outside {{scratch.path}}.\n\nWrite each ticket to {{scratch.path}}/<kind>-NNN-<name>.md where:\n- <kind> is one of: {{params.kinds}}.\n- NNN is a three-digit number, one sequence across all kinds (001, 002, ...), in a sensible build order.\n- <name> is a few lowercase words joined by dashes.\nEach ticket has: # title, ## Goal, ## Scope (what is in and out), ## Acceptance criteria (numbered, checkable, traced to the specs' criteria), ## Depends on (ticket ids, or none), ## Notes (files and modules involved). Keep each ticket small enough for one focused session.\n\nIf ticket files exist from an earlier pass, update them in place, delete ones no longer needed and keep the numbers stable. Leave spike-*.md and prototype-*.md files alone, and start numbering after the highest number already used in {{scratch.path}}.\n\nThen reply with TICKET_ORDER.md, in markdown, and nothing else. It must start with these machine-read lines, each ticket written as its file name without .md, and nothing else on the line:\nWave 1: <ticket ids, comma-separated>\nWave 2: <ticket ids>\n...\nTickets in one wave must not depend on each other and should not edit the same files, so they can be built at the same time; a wave only starts when the one before it is merged. After those lines, add ## Why this order, explaining the dependencies and what can run in parallel."
+  }
+}

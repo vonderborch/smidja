@@ -1,0 +1,27 @@
+{
+  "$schema": "./common-step.schema.json",
+  "schemaVersion": "2.0",
+  "id": "harden",
+  "name": "Harden and file follow-ups",
+  "description": "Fixes the findings left after review (blockers, majors, and small in-scope minors) with tests, and files follow-up tickets for worthwhile out-of-scope work. Pass the findings in with \"findings\".",
+  "tags": [
+    "implementation",
+    "review",
+    "tickets"
+  ],
+  "parameters": [
+    {
+      "id": "findings",
+      "label": "The findings to address",
+      "description": "The review and security findings, e.g. {{steps.review.output}} and {{steps.security.output}}.",
+      "default": ""
+    }
+  ],
+  "step": {
+    "id": "harden",
+    "name": "Harden and file follow-ups",
+    "type": "ai",
+    "createTickets": true,
+    "prompt": "Harden the change for {{ticket.key}}: {{ticket.title}}.\n\nThe findings left after review (parts may be empty when a review was skipped):\n\n{{params.findings}}\n\nFix every remaining blocker and major finding, and any minor one that is small and inside this ticket's scope, with tests. Run the build and the full test suite.\n\nFor worthwhile work that is out of scope (follow-up refactors, tech debt, hardening elsewhere), file follow-up tickets rather than doing it now; give each a clear title and a body that says why it matters and where. Report what you fixed, the tickets you filed, and the test results."
+  }
+}

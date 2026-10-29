@@ -1,0 +1,41 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dc="using:Afl.UI.DataContexts"
+             xmlns:perm="using:Afl.Core.Permissions"
+             xmlns:views="using:Afl.UI.Views"
+             x:Class="Afl.UI.Views.PermissionRulesView"
+             x:DataType="dc:AbstractPermissionRuleListDataContext">
+    <StackPanel Spacing="6">
+        <TextBlock Classes="meta" Text="{Binding EmptyText}" TextWrapping="Wrap" IsVisible="{Binding IsEmpty}" />
+        <ListBox views:RowMenus.IsEnabled="True" ItemsSource="{Binding Rules}" SelectedItem="{Binding Selected}"
+                 IsVisible="{Binding !IsEmpty}" MaxHeight="320">
+            <ListBox.ContextMenu>
+                <ContextMenu>
+                    <MenuItem Header="Copy rule" Click="OnCopy" />
+                    <MenuItem Header="{Binding ToggleText}" Click="OnToggle" IsVisible="{Binding CanAllow}" />
+                    <MenuItem Header="Remove" Click="OnRemove" />
+                </ContextMenu>
+            </ListBox.ContextMenu>
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="perm:PermissionRule">
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Border Classes="chip"><TextBlock Text="{Binding Kind}" /></Border>
+                        <TextBlock Text="{Binding Rule}" FontFamily="{StaticResource MonoFont}" VerticalAlignment="Center" />
+                        <TextBlock Classes="meta" Text="{Binding Note}" VerticalAlignment="Center"
+                                   IsVisible="{Binding Note, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+        <StackPanel Orientation="Horizontal" Spacing="6">
+            <TextBox Text="{Binding NewRule}" PlaceholderText="e.g. Bash(dotnet test:*)" MinWidth="280"
+                     FontFamily="{StaticResource MonoFont}" />
+            <CheckBox Content="Deny" IsChecked="{Binding NewRuleDenies}" IsVisible="{Binding CanAllow}"
+                      ToolTip.Tip="Refuse what the rule matches instead of allowing it" />
+            <Button Content="Add" Click="OnAdd" />
+            <Button Content="Remove" Click="OnRemove" IsEnabled="{Binding HasSelected}" />
+            <Button Content="Reset to defaults" Click="OnReset" IsVisible="{Binding CanReset}" />
+            <TextBlock Classes="ok" VerticalAlignment="Center" Text="{Binding Note}" />
+        </StackPanel>
+    </StackPanel>
+</UserControl>

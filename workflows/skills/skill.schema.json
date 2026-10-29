@@ -1,0 +1,92 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/vonderborch/smidja/workflows/skills/skill.schema.json",
+  "title": "afl common skill",
+  "description": "A skill written once and given to the agents of any step with \"skills\": [\"<id>\"]. Claude agents load it as a session plugin skill (afl-skills:<id>); other agents get its instructions in the prompt. Lives in workflows/skills (built-in), ~/.afl/skills or <repo>/.afl/skills.",
+  "type": "object",
+  "required": ["schemaVersion", "id", "name", "description", "content"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "This schema, for editors. afl ignores it."
+    },
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^1\\.[0-9]+$",
+      "description": "The file format's version."
+    },
+    "id": {
+      "$ref": "../workflow.schema.json#/$defs/id",
+      "description": "Used in \"skills\" and as the file name; overrides a built-in or global skill with the same id."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The name shown in lists."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "What the skill does and when to use it; agents read this to decide when it applies."
+    },
+    "tags": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 40 },
+      "description": "Tags to filter the library by in the UI and with --tag, e.g. review or planning: lowercase letters, digits and hyphens."
+    },
+    "content": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The instructions, in markdown: the body of the skill's SKILL.md."
+    },
+    "files": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Supporting text files the instructions refer to, by path relative to the skill's folder (not SKILL.md)."
+    },
+    "recommend": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "What kind of repo the skill suits, so runs there are offered it (afl skill recommend). It is recommended when one of its files matches a file in the repo, or when the repo's stack has one of its frameworks (or, for a skill naming no frameworks, one of its languages). Leave it out for a general skill that workflows pick themselves (1.2).",
+      "properties": {
+        "files": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["glob"],
+            "additionalProperties": false,
+            "properties": {
+              "glob": {
+                "type": "string",
+                "minLength": 1,
+                "description": "A file pattern (* and ?), matched against each file's name, or against its path from the repo root when it has a /, e.g. *.csproj or src/*.py."
+              },
+              "contains": {
+                "type": "string",
+                "description": "Text the file must contain, ignoring case, e.g. fastapi in pyproject.toml. Only files up to 256 KB are read."
+              }
+            }
+          },
+          "description": "Files that show the skill fits; any one is enough."
+        },
+        "languages": {
+          "type": "array",
+          "items": { "$ref": "../workflow.schema.json#/$defs/id" },
+          "description": "The languages the skill is for, e.g. csharp or python; offered when asking what an empty repo will use."
+        },
+        "frameworks": {
+          "type": "array",
+          "items": { "$ref": "../workflow.schema.json#/$defs/id" },
+          "description": "The frameworks the skill is for, e.g. fastapi or playwright; offered when asking what an empty repo will use."
+        },
+        "reason": {
+          "type": "string",
+          "description": "The reason shown with the recommendation, e.g. C# project."
+        }
+      }
+    }
+  }
+}

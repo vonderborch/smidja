@@ -1,0 +1,49 @@
+{
+  "$schema": "./common-step.schema.json",
+  "schemaVersion": "2.0",
+  "id": "grill-docs",
+  "name": "Grill the docs",
+  "description": "Reads the intent and every piece of documentation relevant to it (READMEs, docs/, CLAUDE.md, ADRs, module comments), then writes RESEARCH.md: how things work today, what likely has to change, and the risks. On a later round it folds in what the spikes and prototypes found. Read-only; asks you when the docs leave something open, and waits for your approval.",
+  "tags": [
+    "planning",
+    "research"
+  ],
+  "parameters": [
+    {
+      "id": "work",
+      "label": "What kind of work this is",
+      "description": "How the prompts name the work, e.g. \"feature\" or \"bug fix\".",
+      "default": "feature"
+    },
+    {
+      "id": "intent",
+      "label": "The intent document",
+      "default": "{{scratch.path}}/INTENT.md"
+    },
+    {
+      "id": "extra",
+      "label": "Anything else to work out",
+      "description": "Extra research asked for on top of the outline, e.g. root-cause hypotheses for a bug.",
+      "default": ""
+    }
+  ],
+  "step": {
+    "id": "research",
+    "name": "Grill the docs",
+    "type": "ai",
+    "advance": "approve",
+    "ask": true,
+    "permissionMode": "default",
+    "allowedTools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git status:*)",
+      "Bash(ls:*)"
+    ],
+    "artifact": "{{scratch.dir}}/RESEARCH.md",
+    "prompt": "We are planning this {{params.work}}: {{ticket.title}}.\n\nRead the intent first: {{params.intent}}\n\nIf this is a later round, {{scratch.path}} already has RESEARCH.md, SPECS.md and FINDINGS.md, with the spike and prototype reports (*_REPORT.md) behind them: read them all, and revise RESEARCH.md with what they found rather than starting over. A finding beats a guess; a prototype a person rejected is not an option.\n\nThen grill the documentation. Find and read every document relevant to this {{params.work}}: READMEs, docs/ folders, CLAUDE.md and other agent instructions, ADRs and design notes, CONTRIBUTING, changelogs, and the doc comments of the modules the intent names or that you find are involved. Read code only as far as you need to check what the docs say or fill gaps they leave. Do not change any files.\n\n{{params.extra}}\n\nIf the docs contradict each other or the intent, or leave something you can't settle by reading, ask.\n\nReply with RESEARCH.md, in markdown, and nothing else:\n\n# Research: {{ticket.title}}\n## Sources read\n(each document with one line on what it told you)\n## How it works today\n## What likely has to change\n(by module or file)\n## Constraints and conventions to respect\n## Risks and unknowns\n## Open questions\n(numbered, each question in bold followed by the assumption you made; leave the section out when there are none)\n\nEnd with a line that is exactly `SECURITY IMPACT: YES` if the change touches authentication, authorization, user input, secrets, personal data, cryptography, network exposure or dependencies, otherwise exactly `SECURITY IMPACT: NONE`."
+  }
+}

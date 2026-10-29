@@ -1,0 +1,43 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "5.0",
+  "id": "ticket-wave",
+  "name": "Ticket wave",
+  "description": "Builds a set of tickets from the scratch directory at the same time, each in its own git worktree and branch running ticket-implement, and merges each one back once it's done. A single-thread run builds them one after another instead.",
+  "tags": [
+    "parallel",
+    "tickets",
+    "worktrees"
+  ],
+  "parameters": [
+    {
+      "id": "tickets",
+      "label": "Tickets",
+      "description": "Ticket ids (their file names in the scratch directory without .md), comma-separated."
+    },
+    {
+      "id": "reviewers",
+      "label": "Reviewers",
+      "description": "The reviewers each ticket goes through at once, comma-separated: each is a review-<name> common step (built in: standards, specs, style). Add your own review-<name> step to add a reviewer.",
+      "default": "standards, specs, style"
+    }
+  ],
+  "steps": [
+    {
+      "id": "implement",
+      "name": "Build the tickets",
+      "type": "workflow",
+      "workflow": "ticket-implement",
+      "forEach": {
+        "kind": "items",
+        "items": "{{params.tickets}}"
+      },
+      "childrenTogether": true,
+      "workspace": "worktree",
+      "with": {
+        "ticket": "{{item}}",
+        "reviewers": "{{params.reviewers}}"
+      }
+    }
+  ]
+}

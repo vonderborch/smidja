@@ -1,0 +1,33 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.2",
+  "id": "msbuild-binlog",
+  "name": "MSBuild binary logs",
+  "description": "Capture and read MSBuild binary logs (.binlog) to find out why a .NET build failed, rebuilt too much, or picked the wrong property or package. Use when console output doesn't explain a build problem.",
+  "tags": [
+    "dotnet",
+    "msbuild",
+    "debugging"
+  ],
+  "recommend": {
+    "files": [
+      {
+        "glob": "*.csproj"
+      },
+      {
+        "glob": "*.sln"
+      },
+      {
+        "glob": "*.slnx"
+      },
+      {
+        "glob": "Directory.Build.props"
+      }
+    ],
+    "languages": [
+      "csharp"
+    ],
+    "reason": ".NET build"
+  },
+  "content": "# MSBuild binary logs\n\nA binary log records everything a build did: every property, item, import, target and task, with timings. It's the fastest way to answer \"why did the build do that?\".\n\n## Capturing one\n\n- Add `-bl` to any build command: `dotnet build -bl:build.binlog`, and likewise `dotnet test`, `restore`, `pack` and `publish`. Name the file after the command so logs don't overwrite each other.\n- To compare two builds (before and after a change, or CI and local), capture both with the same command.\n- **Logs can contain secrets** (environment variables, tokens in feed URLs). Don't commit them or attach them to public issues; delete them when done.\n\n## Reading one\n\nThe file is binary; don't `cat` or `grep` it directly.\n\n- If a step has an MSBuild log MCP server connected, use its tools to query errors, properties, items and target timings.\n- Otherwise replay it to text and search that:\n\n```bash\ndotnet msbuild build.binlog -noconlog -fl -flp:v=diag;logfile=build.log -fl1 -flp1:errorsonly;logfile=errors.log\n```\n\n- Read `errors.log` first, then search `build.log` around the first error. The **first** error is usually the cause; later ones cascade from it.\n- On a desktop, the MSBuild Structured Log Viewer opens `.binlog` files directly and is easier still.\n\n## Common questions\n\n- **Where did this property's value come from?** Find the last assignment of the property in the evaluation and the file and line that set it. Imports from `Directory.Build.*` and NuGet `build/` folders are frequent surprises.\n- **Why did this project rebuild?** Look for a target that ran instead of being skipped and the input it reports as newer than its outputs.\n- **Which package version won?** Check the restore output and `project.assets.json` for the resolved version and the reference that pulled it in.\n- **Why is the build slow?** Sort targets and tasks by time; look for custom targets without `Inputs`/`Outputs` (see `msbuild-hygiene`).\n\nReport the cause with the evidence (the file, line, target or property), not just the fix.\n"
+}

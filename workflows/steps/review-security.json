@@ -1,0 +1,49 @@
+{
+  "$schema": "./common-step.schema.json",
+  "schemaVersion": "2.0",
+  "id": "review-security",
+  "name": "Security review",
+  "description": "Reviews a change for security problems: injection, broken authentication or authorization, exposed secrets or personal data, unsafe deserialization, missing input validation, insecure defaults and vulnerable dependencies, with how each could be exploited. Read-only; one reviewer of the code-review common step and the reviewer workflow (lens \"security\"). Takes scope, context and extra; put a condition on the arrow into it to run it only when a change touches security. Ends with VERDICT: PASS or VERDICT: CHANGES.",
+  "tags": [
+    "review",
+    "reviewer",
+    "security"
+  ],
+  "parameters": [
+    {
+      "id": "scope",
+      "label": "What to review",
+      "description": "The work to review and where to find it.",
+      "default": "the uncommitted changes for {{ticket.key}} (look at git status and git diff HEAD, and read any new untracked files)"
+    },
+    {
+      "id": "context",
+      "label": "What the change is meant to do",
+      "description": "The ticket, requirements or specs to review against; templates such as {{steps.implement.output}} are fine.",
+      "default": "{{ticket.title}}\n\n{{ticket.body}}"
+    },
+    {
+      "id": "extra",
+      "label": "Anything else to check",
+      "description": "Extra instructions for this reviewer, e.g. what matters most for this kind of change.",
+      "default": ""
+    }
+  ],
+  "step": {
+    "id": "review",
+    "name": "Security review",
+    "type": "ai",
+    "permissionMode": "default",
+    "allowedTools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(ls:*)"
+    ],
+    "prompt": "Review {{params.scope}} through the security lens, and only that lens: other reviewers cover the rest. Do not change any files.\n\nWhat it is meant to do:\n\n{{params.context}}\n\nReview it for security problems: injection, broken authentication or authorization, exposure of secrets or personal data (including in logs), unsafe deserialization, missing input validation, insecure defaults, and new dependencies with known vulnerabilities. For each finding say how it could be exploited.\n\n{{params.extra}}\n\nList each finding with its severity (blocker, major, minor, nit), a file reference and the fix. Then end with a line that is exactly `VERDICT: CHANGES` if anything blocker or major is left, otherwise exactly `VERDICT: PASS`."
+  }
+}

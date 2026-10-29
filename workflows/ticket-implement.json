@@ -1,0 +1,91 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "5.0",
+  "id": "ticket-implement",
+  "name": "Implement a ticket",
+  "description": "Builds one ticket from the scratch directory in a fresh session: implements it, has it reviewed by several reviewers at once (by default standards, specs and style, each its own subagent), goes round again on their findings until they all pass (at most four passes), then writes <ticket>_REPORT.md. Runs without asking you anything.",
+  "tags": [
+    "build",
+    "review",
+    "tickets"
+  ],
+  "parameters": [
+    {
+      "id": "ticket",
+      "label": "Ticket",
+      "description": "The ticket id: its file name in the scratch directory without .md, e.g. feature-003-dark-mode-toggle."
+    },
+    {
+      "id": "reviewers",
+      "label": "Reviewers",
+      "description": "The reviewers each ticket goes through at once, comma-separated: each is a review-<name> common step (built in: standards, specs, style). Add your own review-<name> step to add a reviewer.",
+      "default": "standards, specs, style"
+    }
+  ],
+  "skills": [
+    "caveman"
+  ],
+  "steps": [
+    {
+      "id": "implement",
+      "name": "Implement",
+      "type": "ai",
+      "permissionMode": "acceptEdits",
+      "prompt": "Implement ticket {{params.ticket}} of {{ticket.title}}.\n\nRead the ticket, {{scratch.path}}/{{params.ticket}}.md, and the specs it comes from, {{scratch.path}}/SPECS.md. This is pass {{loop.iteration}}.\n\nBuild exactly what the ticket asks, nothing more, following the repo's conventions, with tests. Run the build and the tests.\n\nDon't commit, and don't switch branches: afl commits and merges your work.\n\nIf reviewers sent the work back, address every finding they raised (or say why you didn't):\n{{steps.review.previous}}\n\nReport what you changed, file by file, and the build and test results.",
+      "arrows": [
+        {
+          "to": "review"
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "name": "Review",
+      "type": "workflow",
+      "use": "code-review",
+      "with": {
+        "reviewers": "{{params.reviewers}}",
+        "scope": "the work for ticket {{params.ticket}} (uncommitted in this checkout: look at git status and git diff HEAD, and read any new untracked files)",
+        "context": "Ticket {{params.ticket}}: read it in {{scratch.path}}/{{params.ticket}}.md, and the specs it comes from in {{scratch.path}}/SPECS.md."
+      },
+      "arrows": [
+        {
+          "to": "implement",
+          "until": {
+            "kind": "not",
+            "conditions": [
+              {
+                "kind": "output",
+                "matches": "(?m)^VERDICT: CHANGES\\s*$"
+              }
+            ]
+          },
+          "max": 4,
+          "onLimit": "continue",
+          "label": "changes asked"
+        },
+        {
+          "to": "report"
+        }
+      ]
+    },
+    {
+      "id": "report",
+      "name": "Write the report",
+      "type": "ai",
+      "permissionMode": "default",
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git status:*)",
+        "Bash(git diff:*)",
+        "Bash(git log:*)",
+        "Bash(git show:*)",
+        "Bash(ls:*)"
+      ],
+      "artifact": "{{scratch.dir}}/{{params.ticket}}_REPORT.md",
+      "prompt": "Write the report for ticket {{params.ticket}} ({{scratch.path}}/{{params.ticket}}.md). Do not change any files.\n\nWhat the last pass did:\n{{steps.implement.output}}\n\nThe last reviews:\n{{steps.review.output}}\n\nLook at the change (git status, git diff HEAD) if you need to. Reply with the report, in markdown, and nothing else:\n\n# Report: {{params.ticket}}\n## What was done\n(file by file)\n## Acceptance criteria\n(each of the ticket's criteria: met or not, and how you know)\n## Review rounds\n(how many passes, and what the reviewers raised each time)\n## Unresolved findings\n## What we learned\n(anything later tickets should know)"
+    }
+  ]
+}

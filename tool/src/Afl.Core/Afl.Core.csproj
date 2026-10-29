@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Default workflows live at the repo root so the plugin and the tool share them. -->
+    <EmbeddedResource Include="..\..\..\workflows\*.json" Exclude="..\..\..\workflows\*.schema.json" LogicalName="workflows/%(Filename)%(Extension)" />
+    <!-- Built-in common steps that workflows can use. -->
+    <EmbeddedResource Include="..\..\..\workflows\steps\*.json" Exclude="..\..\..\workflows\steps\*.schema.json" LogicalName="steps/%(Filename)%(Extension)" />
+    <!-- Built-in common skills that steps can use. -->
+    <EmbeddedResource Include="..\..\..\workflows\skills\*.json" Exclude="..\..\..\workflows\skills\*.schema.json" LogicalName="skills/%(Filename)%(Extension)" />
+    <!-- Ready-made agent definitions for well-known AI tools. -->
+    <EmbeddedResource Include="..\..\..\agents\*.json" LogicalName="agents/%(Filename)%(Extension)" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="ModelContextProtocol.Core" Version="2.2.0" />
+    <PackageReference Include="Niddy.Core" Version="$(NiddyVersion)" />
+    <PackageReference Include="Tomlyn" Version="0.19.0" />
+  </ItemGroup>
+
+</Project>

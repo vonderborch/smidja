@@ -1,0 +1,658 @@
+<niddy:Page xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:niddy="https://github.com/vonderborch/Niddy"
+            xmlns:dc="using:Afl.UI.DataContexts"
+            xmlns:views="using:Afl.UI.Views"
+            xmlns:jira="using:Afl.Core.Jira"
+            xmlns:agents="using:Afl.Core.Agents"
+            xmlns:mcp="using:Afl.Core.Mcp"
+            xmlns:hosts="using:Afl.Core.GitHosts"
+            x:Class="Afl.UI.Pages.SettingsPage"
+            x:DataType="dc:SettingsPageDataContext">
+
+    <niddy:Page.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceInclude Source="avares://Afl.UI/Views/AgentFieldEditors.axaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </niddy:Page.Resources>
+
+    <ScrollViewer>
+        <StackPanel Spacing="12" MaxWidth="1100" HorizontalAlignment="Left">
+
+            <TextBlock Classes="h1" Text="Settings" />
+
+            <TextBlock Classes="error" Text="{Binding ErrorMessage}"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+            <TabControl x:Name="Tabs">
+                <TabItem Header="Jira">
+                        <!-- Jira instances (unchanged) -->
+                        <Border Classes="card">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="h2" Text="Jira instances" />
+                                <TextBlock Classes="hint" TextWrapping="Wrap"
+                                           Text="Shared by every repo. Tokens are kept in the system keychain (or afl's encrypted store), never in afl's JSON files." />
+                                <Grid ColumnDefinitions="240,*">
+                                    <DockPanel Grid.Column="0" Margin="0,0,12,0">
+                                        <WrapPanel DockPanel.Dock="Bottom" ItemSpacing="6" LineSpacing="6" Margin="0,6,0,0">
+                                            <Button Content="New" Click="OnNewInstance" />
+                                            <Button Content="Test" Click="OnTestInstance"
+                                                    IsEnabled="{Binding SelectedInstance, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                            <Button Content="Remove…" Click="OnRemoveInstance"
+                                                    IsEnabled="{Binding SelectedInstance, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                        </WrapPanel>
+                                        <ListBox views:RowMenus.IsEnabled="True" ItemsSource="{Binding Instances}" SelectedItem="{Binding SelectedInstance}" MinHeight="120">
+                                            <ListBox.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Test" Click="OnTestInstance" />
+                                                    <Separator />
+                                                    <MenuItem Header="Remove…" Click="OnRemoveInstance" />
+                                                </ContextMenu>
+                                            </ListBox.ContextMenu>
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate x:DataType="jira:JiraInstance">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Name}" />
+                                                        <TextBlock Classes="meta">
+                                                            <TextBlock.Text>
+                                                                <MultiBinding StringFormat="{}{0} · {1}">
+                                                                    <Binding Path="Id" />
+                                                                    <Binding Path="Kind" />
+                                                                </MultiBinding>
+                                                            </TextBlock.Text>
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </DockPanel>
+
+                                    <StackPanel Grid.Column="1" Spacing="6">
+                                        <Grid ColumnDefinitions="*,*,*">
+                                            <HeaderedContentControl Grid.Column="0" Header="Id" Margin="0,0,6,0">
+                                                <TextBox Text="{Binding InstanceId}" PlaceholderText="work" />
+                                            </HeaderedContentControl>
+                                            <HeaderedContentControl Grid.Column="1" Header="Name" Margin="0,0,6,0">
+                                                <TextBox Text="{Binding InstanceName}" PlaceholderText="Work Jira" />
+                                            </HeaderedContentControl>
+                                            <HeaderedContentControl Grid.Column="2" Header="Kind">
+                                                <ComboBox ItemsSource="{Binding Kinds}" SelectedItem="{Binding InstanceKind}"
+                                                          HorizontalAlignment="Stretch" />
+                                            </HeaderedContentControl>
+                                        </Grid>
+                                        <HeaderedContentControl Header="Base URL">
+                                            <TextBox Text="{Binding InstanceBaseUrl}" PlaceholderText="https://example.atlassian.net" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Header="Account email" IsVisible="{Binding IsCloud}">
+                                            <TextBox Text="{Binding InstanceEmail}" PlaceholderText="you@example.com" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Header="Token">
+                                            <TextBox Text="{Binding InstanceToken}" PasswordChar="•" RevealPassword="False"
+                                                     PlaceholderText="API token (Cloud) or personal access token (Data Center)" />
+                                        </HeaderedContentControl>
+                                        <TextBlock Classes="meta" Text="{Binding TokenStatus}" TextWrapping="Wrap" />
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button Classes="accent" Content="Test &amp; save" Click="OnSaveInstance" />
+                                            <ProgressBar IsIndeterminate="True" Width="80" IsVisible="{Binding IsBusy}" />
+                                            <TextBlock Classes="ok" VerticalAlignment="Center" Text="{Binding InstanceStatus}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                </TabItem>
+
+                <!-- GitHub and GitLab -->
+                <TabItem Header="Git hosts">
+                        <Border Classes="card">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="h2" Text="GitHub and GitLab sites" />
+                                <TextBlock Classes="hint" TextWrapping="Wrap"
+                                           Text="Where repos' issues come from. github.com and gitlab.com are built in; add GitHub Enterprise or self-managed GitLab sites here. With no token, afl borrows the gh or glab sign-in. Tokens are kept in the system keychain (or afl's encrypted store), never in afl's JSON files." />
+                                <Grid ColumnDefinitions="240,*">
+                                    <DockPanel Grid.Column="0" Margin="0,0,12,0">
+                                        <WrapPanel DockPanel.Dock="Bottom" ItemSpacing="6" LineSpacing="6" Margin="0,6,0,0">
+                                            <Button Content="New" Click="OnNewGitHost" />
+                                            <Button Content="Test" Click="OnTestGitHost"
+                                                    IsEnabled="{Binding SelectedGitHost, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                            <Button Content="Remove…" Click="OnRemoveGitHost" IsEnabled="{Binding CanRemoveGitHost}" />
+                                        </WrapPanel>
+                                        <ListBox views:RowMenus.IsEnabled="True" ItemsSource="{Binding GitHostConnections}" SelectedItem="{Binding SelectedGitHost}" MinHeight="120">
+                                            <ListBox.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Test" Click="OnTestGitHost" />
+                                                    <MenuItem Header="Clear token" Click="OnClearGitHostToken" />
+                                                    <Separator />
+                                                    <MenuItem Header="Remove…" Click="OnRemoveGitHost" IsEnabled="{Binding CanRemoveGitHost}" />
+                                                </ContextMenu>
+                                            </ListBox.ContextMenu>
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate x:DataType="hosts:GitHostConnection">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding DisplayName}" />
+                                                        <TextBlock Classes="meta">
+                                                            <TextBlock.Text>
+                                                                <MultiBinding StringFormat="{}{0} · {1}">
+                                                                    <Binding Path="Id" />
+                                                                    <Binding Path="Host" />
+                                                                </MultiBinding>
+                                                            </TextBlock.Text>
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </DockPanel>
+
+                                    <StackPanel Grid.Column="1" Spacing="6">
+                                        <Grid ColumnDefinitions="*,*,*">
+                                            <HeaderedContentControl Grid.Column="0" Header="Id" Margin="0,0,6,0">
+                                                <TextBox Text="{Binding GitHostId}" PlaceholderText="work-gitlab"
+                                                         IsReadOnly="{Binding IsGitHostFormLocked}" />
+                                            </HeaderedContentControl>
+                                            <HeaderedContentControl Grid.Column="1" Header="Name" Margin="0,0,6,0">
+                                                <TextBox Text="{Binding GitHostName}" PlaceholderText="Work GitLab"
+                                                         IsReadOnly="{Binding IsGitHostFormLocked}" />
+                                            </HeaderedContentControl>
+                                            <HeaderedContentControl Grid.Column="2" Header="Kind">
+                                                <ComboBox ItemsSource="{Binding GitHostKinds}" SelectedItem="{Binding GitHostKind}"
+                                                          HorizontalAlignment="Stretch" IsEnabled="{Binding !IsGitHostFormLocked}" />
+                                            </HeaderedContentControl>
+                                        </Grid>
+                                        <HeaderedContentControl Header="Base URL">
+                                            <TextBox Text="{Binding GitHostBaseUrl}" PlaceholderText="https://git.example.com"
+                                                     IsReadOnly="{Binding IsGitHostFormLocked}" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Header="Token">
+                                            <TextBox Text="{Binding GitHostToken}" PasswordChar="•" RevealPassword="False"
+                                                     PlaceholderText="Personal access token (optional)" />
+                                        </HeaderedContentControl>
+                                        <TextBlock Classes="meta" Text="{Binding GitHostTokenStatus}" TextWrapping="Wrap" />
+                                        <WrapPanel ItemSpacing="8" LineSpacing="6">
+                                            <Button Classes="accent" Content="Test &amp; save" Click="OnSaveGitHost" />
+                                            <Button Content="Clear token" Click="OnClearGitHostToken"
+                                                    IsEnabled="{Binding SelectedGitHost, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                            <HyperlinkButton Content="Create a token…" NavigateUri="{Binding GitHostTokenUrl}" VerticalAlignment="Center"
+                                                             IsVisible="{Binding GitHostTokenUrl, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                            <ProgressBar IsIndeterminate="True" Width="80" IsVisible="{Binding IsBusy}" />
+                                            <TextBlock Classes="ok" VerticalAlignment="Center" Text="{Binding GitHostStatus}" />
+                                        </WrapPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                </TabItem>
+
+                <!-- AI agents -->
+                <TabItem Header="Agents">
+                    <StackPanel Spacing="12">
+                        <Border Classes="card">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="h2" Text="AI agents" />
+                                <TextBlock Classes="hint" TextWrapping="Wrap"
+                                           Text="The AI systems that can do a step's work: Claude, any command-line tool, or a tool on an MCP server. Give each one capabilities; a step that needs capabilities runs on an installed agent that has them, chosen by the run's main agent." />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <ComboBox ItemsSource="{Binding AgentPresets}" SelectedItem="{Binding SelectedPreset}" MinWidth="260">
+                                        <ComboBox.ItemTemplate>
+                                            <DataTemplate x:DataType="agents:AgentPreset">
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBlock Text="{Binding Agent.Name}" />
+                                                    <TextBlock Classes="ok" Text="installed" IsVisible="{Binding Installed}" />
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </ComboBox.ItemTemplate>
+                                    </ComboBox>
+                                    <Button Content="Add from preset" Click="OnAddPresetAgent"
+                                            IsEnabled="{Binding SelectedPreset, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                </StackPanel>
+                                <Grid ColumnDefinitions="260,*">
+                                    <DockPanel Grid.Column="0" Margin="0,0,12,0">
+                                        <WrapPanel DockPanel.Dock="Bottom" ItemSpacing="6" LineSpacing="6" Margin="0,6,0,0">
+                                            <Button Content="New" Click="OnNewAgent" />
+                                            <Button Content="Remove…" Click="OnRemoveAgent"
+                                                    IsEnabled="{Binding HasSelectedAgent}" />
+                                        </WrapPanel>
+                                        <ListBox views:RowMenus.IsEnabled="True" ItemsSource="{Binding AgentList}" SelectedItem="{Binding SelectedAgent}" MinHeight="200">
+                                            <ListBox.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Test" Click="OnTestAgent" />
+                                                    <Separator />
+                                                    <MenuItem Header="Remove…" Click="OnRemoveAgent" IsEnabled="{Binding HasSelectedAgent}" />
+                                                </ContextMenu>
+                                            </ListBox.ContextMenu>
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate x:DataType="dc:AgentListItem">
+                                                    <StackPanel Spacing="2">
+                                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                                            <TextBlock Text="{Binding Name}" />
+                                                            <TextBlock Classes="error" Margin="0" Text="missing" IsVisible="{Binding IsMissing}"
+                                                                       ToolTip.Tip="Its command isn't installed, or its MCP server isn't registered." />
+                                                        </StackPanel>
+                                                        <TextBlock Classes="meta">
+                                                            <TextBlock.Text>
+                                                                <MultiBinding StringFormat="{}{0} · {1}">
+                                                                    <Binding Path="Id" />
+                                                                    <Binding Path="Kind" />
+                                                                </MultiBinding>
+                                                            </TextBlock.Text>
+                                                        </TextBlock>
+                                                        <ItemsControl ItemsSource="{Binding Capabilities}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <WrapPanel ItemSpacing="4" LineSpacing="4" />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate x:DataType="x:String">
+                                                                    <Border Classes="chip">
+                                                                        <TextBlock Text="{Binding}" />
+                                                                    </Border>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </DockPanel>
+
+                                    <StackPanel Grid.Column="1" Spacing="8"
+                                                IsVisible="{Binding AgentForm, Converter={x:Static ObjectConverters.IsNotNull}}">
+                                        <ToggleSwitch HorizontalAlignment="Right" OnContent="Edit as JSON" OffContent="Edit as JSON"
+                                                      IsChecked="{Binding IsAgentJson}" />
+                                        <ContentControl Content="{Binding AgentForm}">
+                                            <ContentControl.ContentTemplate>
+                                                <DataTemplate x:DataType="dc:AgentFormDataContext">
+                                                    <StackPanel Spacing="8">
+                                                        <HeaderedContentControl Header="Kind" IsVisible="{Binding IsForm}">
+                                                            <ComboBox ItemsSource="{Binding KindChoices}" SelectedItem="{Binding Kind}"
+                                                                      MinWidth="200" IsEnabled="{Binding IsEditable}" />
+                                                        </HeaderedContentControl>
+                                                        <ItemsControl ItemsSource="{Binding Fields}" IsVisible="{Binding IsForm}">
+                                                            <ItemsControl.ItemsPanel>
+                                                                <ItemsPanelTemplate>
+                                                                    <StackPanel Spacing="8" />
+                                                                </ItemsPanelTemplate>
+                                                            </ItemsControl.ItemsPanel>
+                                                            <ItemsControl.ItemTemplate>
+                                                                <DataTemplate x:DataType="dc:AgentFieldDataContext">
+                                                                    <StackPanel Spacing="2">
+                                                                        <TextBlock Classes="meta" Text="{Binding Label}" />
+                                                                        <ContentControl Content="{Binding}"
+                                                                                        ContentTemplate="{StaticResource AgentFieldEditor}" />
+                                                                        <TextBlock Classes="meta" Text="{Binding Help}" TextWrapping="Wrap"
+                                                                                   IsVisible="{Binding Help, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                                                    </StackPanel>
+                                                                </DataTemplate>
+                                                            </ItemsControl.ItemTemplate>
+                                                        </ItemsControl>
+                                                        <TextBox Text="{Binding Json}" IsVisible="{Binding IsJson}" AcceptsReturn="True"
+                                                                 TextWrapping="Wrap" MinHeight="240" IsReadOnly="{Binding IsReadOnly}"
+                                                                 FontFamily="{StaticResource MonoFont}" FontSize="12" />
+                                                        <TextBlock Classes="meta" TextWrapping="Wrap" IsVisible="{Binding IsReadOnly}"
+                                                                   Text="Built-in agents can't be changed. AFL_CLAUDE sets the claude executable." />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ContentControl.ContentTemplate>
+                                        </ContentControl>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button Classes="accent" Content="Save" Click="OnSaveAgent"
+                                                    IsEnabled="{Binding AgentForm.IsEditable, FallbackValue=False}" />
+                                            <Button Content="Test" Click="OnTestAgent" />
+                                            <Button Content="List tools" Click="OnListFormTools"
+                                                    IsVisible="{Binding AgentForm.HasToolFields, FallbackValue=False}"
+                                                    ToolTip.Tip="Connect to the agent's MCP server and offer its tools." />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ProgressBar IsIndeterminate="True" Width="80" IsVisible="{Binding IsBusy}" />
+                                    <SelectableTextBlock Classes="meta" Text="{Binding AgentStatus}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="h2" Text="Preference" />
+                                <TextBlock Classes="hint"
+                                           Text="When several agents can do a step, ties go to the one higher in this list (and the 'first' selector always picks it)." />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <ListBox views:RowMenus.IsEnabled="True" ItemsSource="{Binding AgentPreference}" SelectedItem="{Binding SelectedPreference}"
+                                             MinWidth="260" MinHeight="100">
+                                        <ListBox.ContextMenu>
+                                            <ContextMenu>
+                                                <MenuItem Header="Move up" Click="OnPreferenceUp" />
+                                                <MenuItem Header="Move down" Click="OnPreferenceDown" />
+                                            </ContextMenu>
+                                        </ListBox.ContextMenu>
+                                    </ListBox>
+                                    <StackPanel Spacing="6">
+                                        <Button Content="Up" Click="OnPreferenceUp"
+                                                IsEnabled="{Binding SelectedPreference, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                        <Button Content="Down" Click="OnPreferenceDown"
+                                                IsEnabled="{Binding SelectedPreference, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </TabItem>
+
+                <!-- MCP servers -->
+                <TabItem Header="MCP servers">
+                    <StackPanel Spacing="12">
+                        <Border Classes="card">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="h2" Text="MCP servers" />
+                                <TextBlock Classes="hint" TextWrapping="Wrap"
+                                           Text="Servers afl connects to as a client: as an agent (one of its tools does a step's work) or as extra tools for the agent doing a step. Secrets are kept in the system keychain (or afl's encrypted store); the JSON only says {{secret.NAME}}." />
+                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                    <Button Content="Import…" Click="OnFindImports"
+                                            ToolTip.Tip="Look for servers configured in Claude Code, Claude Desktop, Cursor and Codex." />
+                                    <TextBlock Classes="ok" VerticalAlignment="Center" Text="{Binding ServerStatus}" />
+                                </StackPanel>
+
+                                <Border Classes="step" IsVisible="{Binding IsImporting}">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Text="Servers found. Tick the ones to import; values that look secret go to the secure store." TextWrapping="Wrap" />
+                                        <ItemsControl ItemsSource="{Binding ImportCandidates}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="{x:Type dc:SelectableItem, x:TypeArguments=mcp:McpServerCandidate}">
+                                                    <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding Label}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Button Classes="accent" Content="Import" Click="OnImportServers" />
+                                            <Button Content="Cancel" Click="OnCancelImport" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+
+                                <Grid ColumnDefinitions="240,*">
+                                    <DockPanel Grid.Column="0" Margin="0,0,12,0">
+                                        <WrapPanel DockPanel.Dock="Bottom" ItemSpacing="6" LineSpacing="6" Margin="0,6,0,0">
+                                            <Button Content="New" Click="OnNewServer" />
+                                            <Button Content="Test" Click="OnTestServer" IsEnabled="{Binding HasSelectedServer}" />
+                                            <Button Content="Remove…" Click="OnRemoveServer" IsEnabled="{Binding HasSelectedServer}" />
+                                        </WrapPanel>
+                                        <ListBox views:RowMenus.IsEnabled="True" ItemsSource="{Binding ServerList}" SelectedItem="{Binding SelectedServer}" MinHeight="200">
+                                            <ListBox.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Test" Click="OnTestServer" />
+                                                    <Separator />
+                                                    <MenuItem Header="Remove…" Click="OnRemoveServer" />
+                                                </ContextMenu>
+                                            </ListBox.ContextMenu>
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate x:DataType="mcp:McpServerDefinition">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Name}" />
+                                                        <TextBlock Classes="meta">
+                                                            <TextBlock.Text>
+                                                                <MultiBinding StringFormat="{}{0} · {1}">
+                                                                    <Binding Path="Id" />
+                                                                    <Binding Path="Transport" />
+                                                                </MultiBinding>
+                                                            </TextBlock.Text>
+                                                        </TextBlock>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                    </DockPanel>
+
+                                    <StackPanel Grid.Column="1" Spacing="6">
+                                        <Grid ColumnDefinitions="*,*,*">
+                                            <HeaderedContentControl Grid.Column="0" Header="Id" Margin="0,0,6,0">
+                                                <TextBox Text="{Binding ServerId}" PlaceholderText="github" />
+                                            </HeaderedContentControl>
+                                            <HeaderedContentControl Grid.Column="1" Header="Name" Margin="0,0,6,0">
+                                                <TextBox Text="{Binding ServerName}" PlaceholderText="GitHub" />
+                                            </HeaderedContentControl>
+                                            <HeaderedContentControl Grid.Column="2" Header="Transport">
+                                                <ComboBox ItemsSource="{Binding Transports}" SelectedItem="{Binding ServerTransport}"
+                                                          HorizontalAlignment="Stretch" />
+                                            </HeaderedContentControl>
+                                        </Grid>
+                                        <HeaderedContentControl Header="Description">
+                                            <TextBox Text="{Binding ServerDescription}" PlaceholderText="What its tools are for" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Header="Command" IsVisible="{Binding IsStdio}">
+                                            <TextBox Text="{Binding ServerCommand}" PlaceholderText="npx" />
+                                        </HeaderedContentControl>
+                                        <Grid ColumnDefinitions="*,*" IsVisible="{Binding IsStdio}">
+                                            <HeaderedContentControl Grid.Column="0" Header="Arguments" Margin="0,0,6,0">
+                                                <TextBox Text="{Binding ServerArgs}" AcceptsReturn="True" MinHeight="56"
+                                                         PlaceholderText="One per line" FontFamily="{StaticResource MonoFont}" FontSize="12" />
+                                            </HeaderedContentControl>
+                                            <HeaderedContentControl Grid.Column="1" Header="Environment">
+                                                <TextBox Text="{Binding ServerEnv}" AcceptsReturn="True" MinHeight="56"
+                                                         PlaceholderText="NAME={{secret.NAME}}" FontFamily="{StaticResource MonoFont}" FontSize="12" />
+                                            </HeaderedContentControl>
+                                        </Grid>
+                                        <HeaderedContentControl Header="URL" IsVisible="{Binding IsHttp}">
+                                            <TextBox Text="{Binding ServerUrl}" PlaceholderText="https://example.com/mcp" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Header="Headers" IsVisible="{Binding IsHttp}">
+                                            <TextBox Text="{Binding ServerHeaders}" AcceptsReturn="True" MinHeight="56"
+                                                     PlaceholderText="Authorization=Bearer {{secret.TOKEN}}"
+                                                     FontFamily="{StaticResource MonoFont}" FontSize="12" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Header="Secrets">
+                                            <StackPanel Spacing="4">
+                                                <ItemsControl ItemsSource="{Binding ServerSecrets}">
+                                                    <ItemsControl.ItemTemplate>
+                                                        <DataTemplate x:DataType="dc:McpSecretDataContext">
+                                                            <Grid ColumnDefinitions="160,70,*" Margin="0,0,0,4">
+                                                                <TextBlock Grid.Column="0" Text="{Binding Name}" VerticalAlignment="Center"
+                                                                           FontFamily="{StaticResource MonoFont}" FontSize="12" />
+                                                                <TextBlock Grid.Column="1" Classes="meta" Text="{Binding Status}" VerticalAlignment="Center" />
+                                                                <TextBox Grid.Column="2" Text="{Binding Value}" PasswordChar="•" RevealPassword="False"
+                                                                         PlaceholderText="New value (leave empty to keep)" />
+                                                            </Grid>
+                                                        </DataTemplate>
+                                                    </ItemsControl.ItemTemplate>
+                                                </ItemsControl>
+                                                <StackPanel Orientation="Horizontal" Spacing="6">
+                                                    <TextBox Text="{Binding NewSecretName}" PlaceholderText="SECRET_NAME" MinWidth="160" />
+                                                    <Button Content="Add secret" Click="OnAddSecret" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </HeaderedContentControl>
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <Button Classes="accent" Content="Save" Click="OnSaveServer" />
+                                            <ProgressBar IsIndeterminate="True" Width="80" IsVisible="{Binding IsBusy}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card" IsVisible="{Binding !!ServerTools.Count}">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="h2" Text="Tools" />
+                                <ListBox views:RowMenus.IsEnabled="True" ItemsSource="{Binding ServerTools}" SelectedItem="{Binding SelectedTool}" MaxHeight="280">
+                                    <ListBox.ContextMenu>
+                                        <ContextMenu>
+                                            <MenuItem Header="Create agent from tool" Click="OnCreateAgentFromTool" />
+                                        </ContextMenu>
+                                    </ListBox.ContextMenu>
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate x:DataType="mcp:McpToolInfo">
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding Name}" FontFamily="{StaticResource MonoFont}" />
+                                                <TextBlock Classes="meta" Text="{Binding Description}" TextWrapping="Wrap" MaxLines="2" />
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                                <Button Content="Create agent from tool" Click="OnCreateAgentFromTool"
+                                        IsEnabled="{Binding SelectedTool, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                        ToolTip.Tip="Draft an MCP agent that calls this tool, with its arguments guessed from the tool's schema." />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </TabItem>
+
+                <!-- Execution -->
+                <TabItem Header="Execution">
+                    <StackPanel Spacing="12">
+                        <Border Classes="card">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="h2" Text="Runs" />
+                                <HeaderedContentControl Header="Main agent">
+                                    <StackPanel Spacing="2">
+                                        <ComboBox ItemsSource="{Binding MainAgentChoices}" SelectedItem="{Binding DefaultAgent}" MinWidth="260" />
+                                        <TextBlock Classes="meta" TextWrapping="Wrap"
+                                                   Text="Runs a run's steps unless a step says otherwise, and chooses between agents when several can do a step." />
+                                    </StackPanel>
+                                </HeaderedContentControl>
+                                <HeaderedContentControl Header="Run mode">
+                                    <StackPanel Spacing="2">
+                                        <ComboBox ItemsSource="{Binding RunModes}" SelectedItem="{Binding DefaultRunMode}" MinWidth="260" />
+                                        <TextBlock Classes="meta" Text="{Binding DefaultRunMode.Description, FallbackValue=''}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </HeaderedContentControl>
+                                <HeaderedContentControl Header="Choosing agents">
+                                    <StackPanel Spacing="2">
+                                        <ComboBox ItemsSource="{Binding Selectors}" SelectedItem="{Binding DefaultSelector}" MinWidth="260" />
+                                        <TextBlock Classes="meta" Text="{Binding DefaultSelector.Description, FallbackValue=''}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </HeaderedContentControl>
+                                <HeaderedContentControl Header="Scratch directory">
+                                    <StackPanel Spacing="2">
+                                        <TextBox Text="{Binding ScratchDirectory}" PlaceholderText=".scratch" MaxWidth="260"
+                                                 HorizontalAlignment="Left" MinWidth="260" />
+                                        <TextBlock Classes="meta" TextWrapping="Wrap"
+                                                   Text="A folder at each repo's root where runs keep their working documents, one per ticket or piece of work ({{scratch.dir}}). afl gives it a .gitignore of its own, so it's never tracked. Runs already started keep theirs." />
+                                    </StackPanel>
+                                </HeaderedContentControl>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="accent" Content="Save" Click="OnSaveExecution" />
+                                    <TextBlock Classes="ok" VerticalAlignment="Center" Text="{Binding ExecutionNote}" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="h2" Text="Notifications" />
+                                <TextBlock Classes="hint" TextWrapping="Wrap"
+                                           Text="A desktop notification when a run reaches one of these states. Done and Failed are only for runs you started, not the runs they start." />
+                                <ItemsControl ItemsSource="{Binding NotifyStates}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <WrapPanel Orientation="Horizontal" />
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="{x:Type dc:SelectableItem, x:TypeArguments=x:String}">
+                                            <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" Margin="0,0,16,0" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                                <TextBlock Classes="meta" Text="{Binding NotifierText}" TextWrapping="Wrap" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Classes="accent" Content="Save" Click="OnSaveNotifications" />
+                                    <Button Content="Send a test notification" Click="OnSendTestNotification" />
+                                    <TextBlock Classes="ok" VerticalAlignment="Center" Text="{Binding NotificationNote}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="h2" Text="Capabilities" />
+                                <TextBlock Classes="hint" TextWrapping="Wrap"
+                                           Text="What agents can do and steps can need. Add your own; the main agent reads the description when choosing." />
+                                <Grid ColumnDefinitions="*,*">
+                                    <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,12,0">
+                                        <TextBlock Classes="meta" Text="Built in" />
+                                        <ItemsControl ItemsSource="{Binding BuiltInCapabilities}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="agents:CapabilityDefinition">
+                                                    <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,0,0,2">
+                                                        <Border Classes="chip"><TextBlock Text="{Binding Id}" /></Border>
+                                                        <TextBlock Classes="meta" Text="{Binding Description}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="6">
+                                        <TextBlock Classes="meta" Text="Yours" />
+                                        <ListBox views:RowMenus.IsEnabled="True" ItemsSource="{Binding CustomCapabilities}" SelectedItem="{Binding SelectedCapability}" MinHeight="80">
+                                            <ListBox.ContextMenu>
+                                                <ContextMenu>
+                                                    <MenuItem Header="Remove" Click="OnRemoveCapability" />
+                                                </ContextMenu>
+                                            </ListBox.ContextMenu>
+                                            <ListBox.ItemTemplate>
+                                                <DataTemplate x:DataType="agents:CapabilityDefinition">
+                                                    <StackPanel>
+                                                        <TextBlock Text="{Binding Id}" />
+                                                        <TextBlock Classes="meta" Text="{Binding Description}" TextWrapping="Wrap" />
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </ListBox.ItemTemplate>
+                                        </ListBox>
+                                        <Grid ColumnDefinitions="140,*">
+                                            <TextBox Grid.Column="0" Text="{Binding NewCapabilityId}" PlaceholderText="id" Margin="0,0,6,0" />
+                                            <TextBox Grid.Column="1" Text="{Binding NewCapabilityDescription}" PlaceholderText="What an agent with it can do" />
+                                        </Grid>
+                                        <StackPanel Orientation="Horizontal" Spacing="6">
+                                            <Button Content="Add" Click="OnAddCapability" />
+                                            <Button Content="Remove" Click="OnRemoveCapability"
+                                                    IsEnabled="{Binding SelectedCapability, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Grid>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </TabItem>
+
+                <!-- Permissions -->
+                <TabItem Header="Permissions">
+                    <StackPanel Spacing="12">
+                        <Border Classes="card">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="h2" Text="New runs" />
+                                <HeaderedContentControl Header="When an agent is refused a command">
+                                    <StackPanel Spacing="2">
+                                        <ComboBox ItemsSource="{Binding DefaultPolicies}" SelectedItem="{Binding DefaultPolicy}" MinWidth="260" />
+                                        <TextBlock Classes="meta" Text="{Binding DefaultPolicy.Description, FallbackValue=''}" TextWrapping="Wrap" />
+                                        <TextBlock Classes="meta" Text="{Binding PerRunPolicies}" TextWrapping="Wrap" />
+                                    </StackPanel>
+                                </HeaderedContentControl>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="h2" Text="Rules for every repo" />
+                                <TextBlock Classes="hint" TextWrapping="Wrap"
+                                           Text="Claude Code permission rules, such as Bash(dotnet test:*), WebFetch(domain:github.com) or Edit(src/**). Allow rules are given to every run's agents; deny rules are refused. A repo's own rules are in its settings." />
+                                <views:PermissionRulesView DataContext="{Binding GlobalRules}" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border Classes="card">
+                            <StackPanel Spacing="8">
+                                <TextBlock Classes="h2" Text="Guard rails" />
+                                <TextBlock Classes="hint" TextWrapping="Wrap"
+                                           Text="Refused in every run, whatever its permissions, even in Full auto: Claude Code enforces them itself." />
+                                <views:PermissionRulesView DataContext="{Binding GuardRules}" />
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </TabItem>
+            </TabControl>
+
+        </StackPanel>
+    </ScrollViewer>
+</niddy:Page>

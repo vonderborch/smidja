@@ -1,0 +1,348 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "5.0",
+  "id": "architecture",
+  "name": "Explore architecture options",
+  "description": "Explores the ways to solve an architecture decision and recommends one by your preferences: you fill in the decision and what you value (priorities ranked or weighted, technologies you like or want to avoid, constraints), the AI maps the current architecture (RESEARCH.md) and lays out distinct options (OPTIONS.md), rounds of spikes and prototypes (which you approve) check the claims the options rest on, then a weighted scoring against your preferences (EVALUATION.md) and an ADR-style recommendation (RECOMMENDATION.md) you approve or send back. Optionally it saves the recommendation as an ADR in the repo. Nothing else is changed; prototypes stay on their own branches.",
+  "tags": [
+    "architecture",
+    "planning",
+    "prototypes",
+    "research",
+    "spikes"
+  ],
+  "parameters": [
+    {
+      "id": "options",
+      "label": "How many options",
+      "description": "How many distinct options to lay out, counting the one that keeps or extends what's there today.",
+      "default": "3 to 5"
+    }
+  ],
+  "skills": [
+    "caveman"
+  ],
+  "steps": [
+    {
+      "id": "preferences",
+      "name": "Say what you value",
+      "type": "user",
+      "instructions": "Describe the decision and what matters to you. Your answers become INTENT.md in the scratch directory ({{scratch.dir}}); every option is judged against them.",
+      "inputs": [
+        {
+          "id": "decision",
+          "label": "The decision",
+          "type": "multiline",
+          "help": "What has to be decided, and the problem it solves."
+        },
+        {
+          "id": "context",
+          "label": "Why now",
+          "type": "multiline",
+          "help": "What's driving it: a new feature, a pain point, growth, a deadline.",
+          "required": false
+        },
+        {
+          "id": "priorities",
+          "label": "What matters most",
+          "type": "multichoice",
+          "options": [
+            "simplicity",
+            "maintainability",
+            "extensibility",
+            "performance",
+            "scalability",
+            "reliability",
+            "security",
+            "cost to run",
+            "time to deliver",
+            "team familiarity",
+            "operability and observability",
+            "portability"
+          ],
+          "help": "Pick the qualities the choice should be judged on."
+        },
+        {
+          "id": "weights",
+          "label": "Ranking or weights",
+          "type": "multiline",
+          "help": "Rank the picks, most important first, or give each a weight (e.g. simplicity 5, performance 3). Unranked picks count equally.",
+          "required": false
+        },
+        {
+          "id": "likes",
+          "label": "Preferred technologies and patterns",
+          "type": "multiline",
+          "help": "Languages, frameworks, services or patterns you'd like to use or already know.",
+          "required": false
+        },
+        {
+          "id": "avoid",
+          "label": "Things to avoid",
+          "type": "multiline",
+          "help": "Technologies, vendors or patterns that are off the table, and why.",
+          "required": false
+        },
+        {
+          "id": "constraints",
+          "label": "Hard constraints",
+          "type": "multiline",
+          "help": "Must-haves an option is ruled out for missing: platforms, licences, budget, compliance, compatibility, team size.",
+          "required": false
+        },
+        {
+          "id": "scale",
+          "label": "Expected scale",
+          "type": "multiline",
+          "help": "Load, data size, users, team size, and how they're expected to grow.",
+          "required": false
+        },
+        {
+          "id": "dump",
+          "label": "Brain dump",
+          "type": "multiline",
+          "help": "Options you already have in mind, links, worries.",
+          "required": false
+        }
+      ],
+      "outputTemplate": "# Intent: {{ticket.title}}\n\n{{ticket.key}} {{ticket.url}}\n\n{{ticket.body}}\n\n## The decision\n\n{{inputs.decision}}\n\n## Why now\n\n{{inputs.context}}\n\n## What matters most\n\n{{inputs.priorities}}\n\n## Ranking or weights\n\n{{inputs.weights}}\n\n## Preferred technologies and patterns\n\n{{inputs.likes}}\n\n## Things to avoid\n\n{{inputs.avoid}}\n\n## Hard constraints\n\n{{inputs.constraints}}\n\n## Expected scale\n\n{{inputs.scale}}\n\n## Brain dump\n\n{{inputs.dump}}\n",
+      "artifact": "{{scratch.dir}}/INTENT.md",
+      "arrows": [
+        {
+          "to": "research"
+        }
+      ]
+    },
+    {
+      "id": "research",
+      "name": "Map the current architecture",
+      "use": "grill-docs",
+      "with": {
+        "work": "architecture decision",
+        "extra": "Map the architecture as it bears on the decision: the components and their boundaries, how data and control flow between them, the dependencies and how they're deployed, and the patterns and idioms the code already uses for similar problems. Under What likely has to change, say what each kind of option would touch."
+      },
+      "arrows": [
+        {
+          "to": "options"
+        }
+      ]
+    },
+    {
+      "id": "options",
+      "name": "Lay out the options",
+      "type": "ai",
+      "advance": "approve",
+      "ask": true,
+      "permissionMode": "default",
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git log:*)",
+        "Bash(git show:*)",
+        "Bash(git status:*)",
+        "Bash(ls:*)",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "artifact": "{{scratch.dir}}/OPTIONS.md",
+      "prompt": "Lay out the options for this architecture decision: {{ticket.title}}.\n\nRead, in {{scratch.path}}: INTENT.md (the decision and the user's preferences) and RESEARCH.md (the architecture today). If this is a later round there is also OPTIONS.md, FINDINGS.md and the spike and prototype reports (*_REPORT.md): revise OPTIONS.md with what they found rather than starting over. A finding beats a guess; a prototype a person rejected rules its approach out. Read code, docs and the web as far as you need to. Do not change any files.\n\n{{feedback}}\n\nGive {{params.options}} options that really differ in approach, not variations of one. Include keeping or extending what's there today as one of them. Drop any option that breaks a hard constraint or uses something the user wants to avoid, and say so under Ruled out. Ask the user when the preferences leave something open that would change the options.\n\nReply with OPTIONS.md, in markdown, and nothing else:\n\n# Options: {{ticket.title}}\n## The decision\n## Option N: <name>\n(one section each, with: ### Summary; ### How it fits today's code (what it touches, what it replaces); ### Sketch (the components and how they connect; a mermaid diagram if it helps); ### Strengths; ### Weaknesses; ### Risks; ### Effort and cost; ### Against your preferences (one line per preference); ### Unproven claims (what this option assumes that nobody has checked))\n## Ruled out\n(each option dropped and why)\n## Open questions\n(numbered, each question in bold followed by the assumption you made; leave the section out when there are none)",
+      "arrows": [
+        {
+          "to": "identify"
+        }
+      ]
+    },
+    {
+      "id": "identify",
+      "name": "Identify spikes or prototypes",
+      "use": "to-spikes",
+      "with": {
+        "work": "architecture decision",
+        "brief": "OPTIONS.md",
+        "extra": "Only list what could change which option wins: an unproven claim an option rests on (under its Unproven claims), a fit or performance question, a library's or service's limits. A prototype tries a thin slice of one option, not the whole thing."
+      },
+      "arrows": [
+        {
+          "to": "spikes",
+          "when": {
+            "kind": "output",
+            "step": "identify",
+            "matches": "(?m)^Spikes: \\S"
+          },
+          "label": "spikes"
+        },
+        {
+          "to": "prototypes",
+          "when": {
+            "kind": "output",
+            "step": "identify",
+            "matches": "(?m)^Prototypes: \\S"
+          },
+          "label": "prototypes"
+        },
+        {
+          "to": "evaluate",
+          "when": {
+            "kind": "output",
+            "step": "identify",
+            "matches": "(?m)^NONE\\s*$"
+          },
+          "label": "nothing to try"
+        },
+        {
+          "to": "findings",
+          "when": {
+            "kind": "not",
+            "conditions": [
+              {
+                "kind": "any",
+                "conditions": [
+                  {
+                    "kind": "output",
+                    "step": "identify",
+                    "matches": "(?m)^Spikes: \\S"
+                  },
+                  {
+                    "kind": "output",
+                    "step": "identify",
+                    "matches": "(?m)^Prototypes: \\S"
+                  },
+                  {
+                    "kind": "output",
+                    "step": "identify",
+                    "matches": "(?m)^NONE\\s*$"
+                  }
+                ]
+              }
+            ]
+          },
+          "label": "nothing listed"
+        }
+      ]
+    },
+    {
+      "id": "spikes",
+      "name": "Research the spikes",
+      "type": "workflow",
+      "workflow": "ticket-spike",
+      "forEach": {
+        "kind": "lines",
+        "step": "identify",
+        "pattern": "^Spikes: (.+)$",
+        "separator": ","
+      },
+      "childrenTogether": true,
+      "with": {
+        "ticket": "{{item}}",
+        "brief": "OPTIONS.md"
+      },
+      "arrows": [
+        {
+          "to": "findings"
+        }
+      ]
+    },
+    {
+      "id": "prototypes",
+      "name": "Build the prototypes",
+      "type": "workflow",
+      "workflow": "ticket-prototype",
+      "forEach": {
+        "kind": "lines",
+        "step": "identify",
+        "pattern": "^Prototypes: (.+)$",
+        "separator": ","
+      },
+      "childrenTogether": true,
+      "workspace": "worktree",
+      "mergeBack": false,
+      "with": {
+        "ticket": "{{item}}",
+        "brief": "OPTIONS.md"
+      },
+      "arrows": [
+        {
+          "to": "findings"
+        }
+      ]
+    },
+    {
+      "id": "findings",
+      "name": "Approve the findings",
+      "use": "review-findings",
+      "with": {
+        "work": "architecture decision",
+        "brief": "OPTIONS.md"
+      },
+      "arrows": [
+        {
+          "to": "options",
+          "max": 4,
+          "onLimit": "continue",
+          "label": "another round"
+        },
+        {
+          "to": "evaluate"
+        }
+      ]
+    },
+    {
+      "id": "evaluate",
+      "name": "Score the options",
+      "type": "ai",
+      "ask": true,
+      "permissionMode": "default",
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git log:*)",
+        "Bash(git show:*)",
+        "Bash(git status:*)",
+        "Bash(ls:*)"
+      ],
+      "artifact": "{{scratch.dir}}/EVALUATION.md",
+      "prompt": "Score the options for {{ticket.title}} against the user's preferences.\n\nRead, in {{scratch.path}}: INTENT.md (the preferences, ranking and weights), OPTIONS.md, RESEARCH.md, FINDINGS.md if there is one, and the spike and prototype reports (*_REPORT.md). Do not change any files.\n\n{{feedback}}\n\nTurn the preferences into criteria with weights: use the user's weights as given; for a ranking, weight the first highest and go down evenly; unranked picks count equally. Ask the user if the ranking is unclear. Score each option 1 to 5 on each criterion, with a short reason that cites the options, the research or a finding; an unproven claim scores as uncertain, not as true. Hard constraints and things to avoid are pass or fail, not weights.\n\nReply with EVALUATION.md, in markdown, and nothing else:\n\n# Evaluation: {{ticket.title}}\n## Criteria and weights\n(and where each weight came from)\n## Scores\n(a table: options as rows, criteria as columns, then the weighted total)\n## Reasons\n(per option, per criterion, one line each)\n## Sensitivity\n(would a reasonable change to the weights change the winner? which weight decides it?)\n## Confidence\n(which scores rest on evidence and which on judgement)",
+      "arrows": [
+        {
+          "to": "recommend"
+        }
+      ]
+    },
+    {
+      "id": "recommend",
+      "name": "Recommend an option",
+      "type": "ai",
+      "advance": "approve",
+      "permissionMode": "default",
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git log:*)",
+        "Bash(git show:*)",
+        "Bash(git status:*)",
+        "Bash(ls:*)"
+      ],
+      "artifact": "{{scratch.dir}}/RECOMMENDATION.md",
+      "prompt": "Recommend an option for {{ticket.title}}, as an architecture decision record.\n\nRead, in {{scratch.path}}: INTENT.md, RESEARCH.md, OPTIONS.md, EVALUATION.md, FINDINGS.md if there is one, and the spike and prototype reports (*_REPORT.md). Do not change any files.\n\n{{feedback}}\n\nRecommend the option that best fits the user's preferences, as scored. If you'd pick a different one than the scores do, say so and why, but put the user's preferences first. If the user's feedback above asks for another option or changes the preferences, follow it and rescore as needed.\n\nReply with RECOMMENDATION.md, in markdown, and nothing else:\n\n# ADR: <the decision, as a short title>\n## Status\nProposed\n## Context\n## Decision drivers\n(the user's preferences, in order of weight)\n## Options considered\n(one line each, with its weighted score)\n## Decision\n(the recommended option, in a few sentences)\n## Why\n(against each decision driver, with the evidence)\n## Why not the others\n## Consequences\n(good, bad and neutral)\n## First steps\n(what to build first, and what to prove early)\n## Revisit when\n(what would make this the wrong choice)",
+      "arrows": [
+        {
+          "to": "adr"
+        }
+      ]
+    },
+    {
+      "id": "adr",
+      "name": "Save the ADR",
+      "type": "ai",
+      "permissionMode": "acceptEdits",
+      "optional": {
+        "default": false,
+        "help": "Saves the approved recommendation as an ADR in the repo, where it keeps them (e.g. docs/adr), numbered after the last one."
+      },
+      "prompt": "Save the approved recommendation, {{scratch.path}}/RECOMMENDATION.md, as an architecture decision record in this repo.\n\nFind where the repo keeps ADRs or design decisions (docs/adr, docs/decisions, adr/, or what CLAUDE.md or the docs say). If there is none, use docs/adr. Follow the existing ADRs' numbering, file naming and template; if there are none, name it 0001-<short-title>.md and keep RECOMMENDATION.md's layout. Set its status to Accepted and add today's date. Change nothing else, and don't commit.\n\nReport the file you wrote."
+    }
+  ]
+}

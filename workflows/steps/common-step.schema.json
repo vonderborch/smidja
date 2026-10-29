@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/vonderborch/smidja/workflows/steps/common-step.schema.json",
+  "title": "afl common step",
+  "description": "A step written once that workflows reuse with \"use\": \"<id>\", filling its {{params.<id>}} with \"with\" and overriding any of its fields. Lives in workflows/steps (built-in), ~/.afl/steps or <repo>/.afl/steps.",
+  "type": "object",
+  "required": ["schemaVersion", "id", "name", "step"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "This schema, for editors. afl ignores it."
+    },
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^2\\.[0-9]+$",
+      "description": "The file format's version."
+    },
+    "id": {
+      "$ref": "../workflow.schema.json#/$defs/id",
+      "description": "Used in \"use\" and as the file name; overrides a built-in or global common step with the same id."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The name shown in lists."
+    },
+    "description": {
+      "type": "string",
+      "description": "What the step does and when to use it."
+    },
+    "tags": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$", "maxLength": 40 },
+      "description": "Tags to filter the library by in the UI and with --tag, e.g. review or planning: lowercase letters, digits and hyphens."
+    },
+    "parameters": {
+      "type": "array",
+      "items": {
+        "$ref": "../workflow.schema.json#/$defs/parameter"
+      },
+      "description": "Values a using step gives in \"with\", written {{params.<id>}} anywhere in the step."
+    },
+    "step": {
+      "$ref": "../workflow.schema.json#/$defs/step",
+      "description": "The step itself; its id and name are what a using step's default to. It can't itself use or include."
+    }
+  }
+}

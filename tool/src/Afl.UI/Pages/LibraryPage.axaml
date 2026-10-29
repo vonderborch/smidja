@@ -1,0 +1,956 @@
+<niddy:Page xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:niddy="https://github.com/vonderborch/Niddy"
+            xmlns:dc="using:Afl.UI.DataContexts"
+            xmlns:wf="using:Afl.Core.Workflows"
+            xmlns:views="using:Afl.UI.Views"
+            x:Class="Afl.UI.Pages.AbstractLibraryPage"
+            x:DataType="dc:LibraryPageDataContext">
+
+    <niddy:Page.Resources>
+        <!-- A ticked-or-not id in a capability or server list -->
+        <DataTemplate x:Key="CheckItem" x:DataType="{x:Type dc:SelectableItem, x:TypeArguments=x:String}">
+            <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" />
+        </DataTemplate>
+        <ItemsPanelTemplate x:Key="WrapItems"><WrapPanel ItemSpacing="16" /></ItemsPanelTemplate>
+        <!-- Ids picked from a set of choices: the picked ones, each with Remove, then a dropdown and Add -->
+        <DataTemplate x:Key="PickList" x:DataType="dc:PickListDataContext">
+            <views:PickListView />
+        </DataTemplate>
+        <!-- What a step does: the fields of one written out here, which a step based on a common step can override -->
+        <DataTemplate x:Key="StepFields" x:DataType="dc:StepDraftDataContext">
+            <StackPanel Spacing="6">
+            <Grid ColumnDefinitions="*,2*">
+                <HeaderedContentControl Grid.Column="0" Header="When done" Margin="0,0,6,0">
+                    <ComboBox ItemsSource="{x:Static dc:StepDraftDataContext.AdvanceChoices}"
+                              SelectedItem="{Binding Advance}" HorizontalAlignment="Stretch" />
+                </HeaderedContentControl>
+                <TextBlock Grid.Column="1" Classes="meta" TextWrapping="Wrap" VerticalAlignment="Bottom"
+                           Margin="0,0,0,6" Text="{Binding AdvanceHelp}" />
+            </Grid>
+            <ContentControl Content="{Binding Details}" />
+            <!-- Parameter values for a child workflow -->
+            <HeaderedContentControl Header="Parameter values" IsVisible="{Binding ShowsOwnWith}">
+                <StackPanel Spacing="2">
+                    <ContentControl Content="{Binding With}" />
+                    <TextBlock Classes="meta" TextWrapping="Wrap" Text="{Binding WithHelp}"
+                               IsVisible="{Binding With.HasValues}" />
+                </StackPanel>
+            </HeaderedContentControl>
+
+            <HeaderedContentControl Header="Save the output to (optional)">
+                <StackPanel Spacing="2">
+                    <TextBox Text="{Binding Artifact}" PlaceholderText="e.g. docs/afl/{{ticket.slug}}/DESIGN.md" />
+                    <TextBlock Classes="meta" TextWrapping="Wrap"
+                               Text="A file in the repo; later steps read its path as {{steps.&lt;step&gt;.artifact}}." />
+                </StackPanel>
+            </HeaderedContentControl>
+
+            <HeaderedContentControl Header="Output template (optional)">
+                <StackPanel Spacing="2">
+                    <TextBox Text="{Binding OutputTemplate}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60"
+                             FontFamily="{StaticResource MonoFont}" FontSize="12"
+                             PlaceholderText="e.g. # Intent&#x0a;&#x0a;## Goal&#x0a;&#x0a;{{inputs.goal}}" />
+                    <TextBlock Classes="meta" TextWrapping="Wrap"
+                               Text="When set, the step's output is this, filled in with its answers ({{inputs.&lt;input&gt;}}) and what it gave ({{output}}), so a form can become a document." />
+                </StackPanel>
+            </HeaderedContentControl>
+
+            <!-- Inputs -->
+            <StackPanel Spacing="6" Margin="0,6,0,0">
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Add input" Click="OnAddInput" />
+                    <StackPanel>
+                        <TextBlock Classes="h2" Text="Inputs" />
+                        <TextBlock Classes="meta" TextWrapping="Wrap"
+                                   Text="Questions for you. before: asked before the step starts (its prompt can use {{inputs.&lt;id&gt;}}). after: asked when you approve it or mark it done. ai: the AI asks only if it needs the answer. Later steps use the answers as {{steps.&lt;step&gt;.inputs.&lt;id&gt;}}." />
+                    </StackPanel>
+                </DockPanel>
+                <ItemsControl ItemsSource="{Binding Inputs}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="dc:InputDraftDataContext">
+                            <Border Classes="step">
+                                <DockPanel>
+                                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,4">
+                                        <Button DockPanel.Dock="Right" Content="Remove" Click="OnRemoveInput" />
+                                        <StackPanel Orientation="Horizontal" Spacing="12">
+                                            <StackPanel Orientation="Horizontal" Spacing="6">
+                                                <TextBlock Text="Asked" VerticalAlignment="Center" />
+                                                <ComboBox ItemsSource="{x:Static dc:InputDraftDataContext.Timings}"
+                                                          SelectedItem="{Binding When}" MinWidth="110" />
+                                            </StackPanel>
+                                            <CheckBox Content="Required" IsChecked="{Binding Required}" />
+                                        </StackPanel>
+                                    </DockPanel>
+                                    <Grid ColumnDefinitions="*,2*,*" RowDefinitions="Auto,Auto,Auto">
+                                        <HeaderedContentControl Grid.Row="0" Grid.Column="0" Header="Id" Margin="0,0,6,0">
+                                            <TextBox Text="{Binding Id}" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Grid.Row="0" Grid.Column="1" Header="Question" Margin="0,0,6,0">
+                                            <TextBox Text="{Binding Label}" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Grid.Row="0" Grid.Column="2" Header="Type">
+                                            <ComboBox ItemsSource="{x:Static dc:InputDraftDataContext.Types}"
+                                                      SelectedItem="{Binding Type}" HorizontalAlignment="Stretch" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Grid.Row="1" Grid.Column="0" Grid.ColumnSpan="2"
+                                                                Header="Options" Margin="0,6,6,0" IsVisible="{Binding UsesOptions}">
+                                            <TextBox Text="{Binding Options}" PlaceholderText="Comma-separated, e.g. low, medium, high" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Grid.Row="1" Grid.Column="2" Header="Default" Margin="0,6,0,0">
+                                            <TextBox Text="{Binding Default}" PlaceholderText="(none)" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Grid.Row="2" Grid.Column="0" Grid.ColumnSpan="3" Header="Help"
+                                                                Margin="0,6,0,0">
+                                            <TextBox Text="{Binding Help}" PlaceholderText="Shown under the question (optional)" />
+                                        </HeaderedContentControl>
+                                    </Grid>
+                                </DockPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+            </StackPanel>
+        </DataTemplate>
+    </niddy:Page.Resources>
+
+    <niddy:Page.DataTemplates>
+        <!-- An arrow's condition: the fields its kind uses, and its nested conditions, each shown with this template -->
+        <DataTemplate DataType="dc:ConditionDraftDataContext">
+            <StackPanel Spacing="4">
+                <Grid ColumnDefinitions="*,*">
+                    <HeaderedContentControl Grid.Column="0" Header="Condition" Margin="0,0,6,0">
+                        <ComboBox ItemsSource="{x:Static dc:ConditionDraftDataContext.KindChoices}" SelectedItem="{Binding Kind}" HorizontalAlignment="Stretch" />
+                    </HeaderedContentControl>
+                    <HeaderedContentControl Grid.Column="1" Header="On step" IsVisible="{Binding UsesStep}">
+                        <ComboBox ItemsSource="{Binding StepChoices}" SelectedItem="{Binding StepRef}" HorizontalAlignment="Stretch" />
+                    </HeaderedContentControl>
+                </Grid>
+                <TextBlock Classes="meta" TextWrapping="Wrap" Text="{Binding KindHelp}" />
+                <Grid ColumnDefinitions="*,*" IsVisible="{Binding UsesInput}">
+                    <HeaderedContentControl Grid.Column="0" Header="Input id" Margin="0,0,6,0">
+                        <TextBox Text="{Binding Input}" />
+                    </HeaderedContentControl>
+                    <HeaderedContentControl Grid.Column="1" Header="Answer equals">
+                        <TextBox Text="{Binding EqualTo}" PlaceholderText="e.g. yes" />
+                    </HeaderedContentControl>
+                </Grid>
+                <Grid ColumnDefinitions="*,*" IsVisible="{Binding UsesText}">
+                    <HeaderedContentControl Grid.Column="0" Header="Output contains" Margin="0,0,6,0">
+                        <TextBox Text="{Binding Contains}" PlaceholderText="Text (ignores case)" />
+                    </HeaderedContentControl>
+                    <HeaderedContentControl Grid.Column="1" Header="…or matches">
+                        <TextBox Text="{Binding Matches}" PlaceholderText="Regular expression" FontFamily="{StaticResource MonoFont}" />
+                    </HeaderedContentControl>
+                </Grid>
+                <Grid ColumnDefinitions="2*,*" IsVisible="{Binding UsesQuestion}">
+                    <HeaderedContentControl Grid.Column="0" Header="Yes/no question about the output" Margin="0,0,6,0">
+                        <TextBox Text="{Binding Question}" PlaceholderText="e.g. Do all the tests pass?" />
+                    </HeaderedContentControl>
+                    <HeaderedContentControl Grid.Column="1" Header="Answered by">
+                        <ComboBox ItemsSource="{Binding AgentChoices}" SelectedItem="{Binding Agent}" HorizontalAlignment="Stretch" />
+                    </HeaderedContentControl>
+                </Grid>
+                <StackPanel Spacing="4" IsVisible="{Binding UsesNested}">
+                    <ItemsControl ItemsSource="{Binding Children}">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate><StackPanel Spacing="4" /></ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="dc:ConditionDraftDataContext">
+                                <!-- Nested conditions indent by a thin rule only, so a deep one keeps its width -->
+                                <Border Classes="nested">
+                                    <StackPanel Spacing="2">
+                                        <Button Content="Remove" Click="OnRemoveCondition" HorizontalAlignment="Right" />
+                                        <ContentControl Content="{Binding}" />
+                                    </StackPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Button Content="Add condition" Click="OnAddCondition" />
+                </StackPanel>
+            </StackPanel>
+        </DataTemplate>
+        <!-- One item of a custom waitFor: the arrow from a step -->
+        <DataTemplate DataType="dc:WaitStepDraftDataContext">
+            <DockPanel>
+                <TextBlock Text="the arrow from" VerticalAlignment="Center" Margin="0,0,8,0" />
+                <ComboBox ItemsSource="{Binding StepChoices}" SelectedItem="{Binding Step}" MinWidth="140" />
+            </DockPanel>
+        </DataTemplate>
+        <!-- A group of a custom waitFor: all, any or at least n of its items, which may be groups themselves -->
+        <DataTemplate DataType="dc:WaitGroupDraftDataContext">
+            <StackPanel Spacing="4">
+                <WrapPanel Orientation="Horizontal">
+                    <ComboBox ItemsSource="{x:Static dc:WaitGroupDraftDataContext.KindChoices}" SelectedItem="{Binding Kind}"
+                              MinWidth="100" Margin="0,0,8,0"
+                              ToolTip.Tip="all: every one that can still fire. any: the first. atLeast: that many of them." />
+                    <NumericUpDown Value="{Binding Count}" Minimum="1" Maximum="20" Increment="1" FormatString="0" MinWidth="110"
+                                   IsVisible="{Binding UsesCount}" Margin="0,0,8,0" />
+                    <TextBlock Text="of" VerticalAlignment="Center" Margin="0,0,8,0" />
+                    <TextBlock Text="{Binding Summary}" Classes="meta" VerticalAlignment="Center" TextWrapping="Wrap" />
+                </WrapPanel>
+                <ItemsControl ItemsSource="{Binding Items}" Margin="16,0,0,0">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Spacing="4" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="dc:AbstractWaitItemDraftDataContext">
+                            <Border Classes="step">
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Content="Remove" Click="OnRemoveWaitItem"
+                                            VerticalAlignment="Top" Margin="6,0,0,0" />
+                                    <ContentControl Content="{Binding}" />
+                                </DockPanel>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <StackPanel Orientation="Horizontal" Spacing="6" Margin="16,0,0,0">
+                    <Button Content="Add step" Click="OnAddWaitStep" />
+                    <Button Content="Add group" Click="OnAddWaitGroup" />
+                </StackPanel>
+            </StackPanel>
+        </DataTemplate>
+        <!-- Values for a common step's, workflow's or child workflow's parameters -->
+        <DataTemplate DataType="dc:WithValuesDataContext">
+            <StackPanel Spacing="4">
+                <TextBlock Classes="meta" Text="It has no parameters." IsVisible="{Binding !HasValues}" />
+                <ItemsControl ItemsSource="{Binding Values}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><StackPanel Spacing="4" /></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="dc:ParameterValueDataContext">
+                            <Grid ColumnDefinitions="160,*" RowDefinitions="Auto,Auto">
+                                <TextBlock Grid.Column="0" Text="{Binding Label}" VerticalAlignment="Center"
+                                           TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Id}" Margin="0,0,6,0" />
+                                <TextBox Grid.Column="1" Text="{Binding Value}" PlaceholderText="{Binding Placeholder}" />
+                                <TextBlock Grid.Row="1" Grid.Column="1" Classes="meta" TextWrapping="Wrap" Text="{Binding Help}"
+                                           IsVisible="{Binding Help, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </StackPanel>
+        </DataTemplate>
+        <!-- The per-type part of the step editor -->
+        <DataTemplate x:DataType="dc:WorkflowStepDetailsDataContext">
+                                            <Border Classes="step">
+                <StackPanel Spacing="6">
+                    <TextBlock Classes="meta" TextWrapping="Wrap"
+                               Text="Starts runs of another workflow and, unless told not to, waits for them. Its output is the children's: with one child, its last output (or the step named below); with several, each under a heading." />
+                    <Grid ColumnDefinitions="*,*,*">
+                        <HeaderedContentControl Grid.Column="0" Header="Workflow" Margin="0,0,6,0">
+                            <ComboBox ItemsSource="{Binding Step.WorkflowChoices}" SelectedItem="{Binding ChildWorkflow}"
+                                      HorizontalAlignment="Stretch" />
+                        </HeaderedContentControl>
+                        <HeaderedContentControl Grid.Column="1" Header="For each" Margin="0,0,6,0">
+                            <ComboBox ItemsSource="{x:Static dc:WorkflowStepDetailsDataContext.ForEachChoices}"
+                                      SelectedItem="{Binding ForEachKind}" HorizontalAlignment="Stretch" />
+                        </HeaderedContentControl>
+                        <HeaderedContentControl Grid.Column="2" Header="Children's main agent">
+                            <ComboBox ItemsSource="{Binding Step.AgentChoices}" SelectedItem="{Binding Step.Agent}"
+                                      HorizontalAlignment="Stretch" />
+                        </HeaderedContentControl>
+                    </Grid>
+                    <TextBlock Classes="meta" TextWrapping="Wrap" Text="{Binding ForEachHelp}" />
+                    <HeaderedContentControl Header="Earlier step it reads" IsVisible="{Binding UsesForEachStep}">
+                        <ComboBox ItemsSource="{Binding ForEachStepChoices}" SelectedItem="{Binding ForEachStep}"
+                                  HorizontalAlignment="Left" MinWidth="200" />
+                    </HeaderedContentControl>
+                    <HeaderedContentControl Header="Tickets" IsVisible="{Binding UsesForEachTickets}">
+                        <TextBox Text="{Binding ForEachTickets}" AcceptsReturn="True" TextWrapping="Wrap"
+                                 PlaceholderText="Comma- or line-separated, e.g. ABC-12, ABC-13, or {{steps.plan.output}}" />
+                    </HeaderedContentControl>
+                    <HeaderedContentControl Header="Items" IsVisible="{Binding UsesForEachItems}">
+                        <TextBox Text="{Binding ForEachItems}" AcceptsReturn="True" TextWrapping="Wrap"
+                                 PlaceholderText="Comma- or line-separated, e.g. standards, specs, style, or {{params.tickets}}" />
+                    </HeaderedContentControl>
+                    <Grid ColumnDefinitions="2*,*" IsVisible="{Binding UsesForEachPattern}">
+                        <HeaderedContentControl Grid.Column="0" Header="Keep lines matching (optional)" Margin="0,0,6,0">
+                            <TextBox Text="{Binding ForEachPattern}" FontFamily="{StaticResource MonoFont}"
+                                     PlaceholderText="A regex, e.g. ^Wave \d+: (.+)$ (its first group is kept)" />
+                        </HeaderedContentControl>
+                        <HeaderedContentControl Grid.Column="1" Header="Split each into items on (optional)">
+                            <TextBox Text="{Binding ForEachSeparator}" PlaceholderText="e.g. ," />
+                        </HeaderedContentControl>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,*,*">
+                        <HeaderedContentControl Grid.Column="0" Header="Wait for them" Margin="0,0,6,0">
+                            <ComboBox ItemsSource="{x:Static dc:WorkflowStepDetailsDataContext.ChildrenChoices}"
+                                      SelectedItem="{Binding Children}" HorizontalAlignment="Stretch"
+                                      ToolTip.Tip="all (default): the step waits until every child has finished. none: it finishes once they've started." />
+                        </HeaderedContentControl>
+                        <HeaderedContentControl Grid.Column="1" Header="Child output step (optional)" Margin="0,0,6,0">
+                            <TextBox Text="{Binding ChildOutput}" PlaceholderText="(its last step with output)" />
+                        </HeaderedContentControl>
+                        <StackPanel Grid.Column="2" Spacing="2" VerticalAlignment="Bottom">
+                            <CheckBox Content="All at once" IsChecked="{Binding ChildrenTogether}"
+                                      ToolTip.Tip="Drive the children at the same time. Unless each has a worktree of its own, they share the repo's working tree, so this suits read-only work." />
+                            <CheckBox Content="Reuse an existing run" IsChecked="{Binding Reuse}"
+                                      ToolTip.Tip="Use a run of the workflow already on the same ticket instead of starting one" />
+                        </StackPanel>
+                    </Grid>
+                    <Grid ColumnDefinitions="*,2*">
+                        <HeaderedContentControl Grid.Column="0" Header="Children work in" Margin="0,0,6,0">
+                            <ComboBox ItemsSource="{x:Static dc:StepDraftDataContext.WorkspaceChoices}"
+                                      SelectedItem="{Binding Step.Workspace}" HorizontalAlignment="Stretch"
+                                      ToolTip.Tip="shared (default): the parent's checkout. worktree: each child gets its own git worktree and branch, merged back once it's done." />
+                        </HeaderedContentControl>
+                        <CheckBox Grid.Column="1" Content="Merge each child's work back when it's done" IsChecked="{Binding Step.MergeBack}"
+                                  IsVisible="{Binding Step.ShowsMergeBack}" VerticalAlignment="Bottom"
+                                  ToolTip.Tip="Untick to keep each child's branch unmerged, e.g. for spikes. A merge that conflicts fails the step, keeping the branch and worktree for you to resolve." />
+                    </Grid>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+        <DataTemplate x:DataType="dc:AgentStepDetailsDataContext">
+            <StackPanel Spacing="6">
+                <HeaderedContentControl Header="Prompt (what the AI is asked to do)">
+                    <views:MarkdownView IsEditable="True" Markdown="{Binding Prompt}" Placeholder="{Binding PromptPlaceholder}"
+                                        Title="Prompt" MinHeight="160" />
+                </HeaderedContentControl>
+                <Grid ColumnDefinitions="*,*,*" RowDefinitions="Auto,Auto">
+                    <HeaderedContentControl Grid.Column="0" Header="{Binding AgentHeader}" Margin="0,0,6,0">
+                        <StackPanel Spacing="4">
+                            <ComboBox ItemsSource="{Binding Step.AgentChoices}" IsVisible="{Binding ShowsOneAgent}"
+                                      SelectedItem="{Binding Step.Agent}" HorizontalAlignment="Stretch" />
+                            <CheckBox Content="Several agents" IsChecked="{Binding UsesSeveralAgents}"
+                                      ToolTip.Tip="Have two or more agents each do the step, then choose, merge or keep every result" />
+                        </StackPanel>
+                    </HeaderedContentControl>
+                    <HeaderedContentControl Grid.Column="1" Header="Permission mode" Margin="0,0,6,0">
+                        <ComboBox ItemsSource="{x:Static dc:AgentStepDetailsDataContext.PermissionModes}"
+                                  SelectedItem="{Binding PermissionMode}" HorizontalAlignment="Stretch" />
+                    </HeaderedContentControl>
+                    <HeaderedContentControl Grid.Column="2" Header="Model">
+                        <TextBox Text="{Binding Model}" PlaceholderText="(default)" />
+                    </HeaderedContentControl>
+                    <HeaderedContentControl Grid.Row="1" Grid.ColumnSpan="3" Header="Allowed tools" Margin="0,6,0,0">
+                        <TextBox Text="{Binding AllowedTools}" PlaceholderText="Comma-separated, e.g. Read, Grep, Bash(git log:*)" />
+                    </HeaderedContentControl>
+                </Grid>
+    
+                <!-- Choosing the agent by capability, delegation and extra tools -->
+                <Border Classes="step">
+                    <StackPanel Spacing="6">
+                        <HeaderedContentControl Header="Capabilities the step needs" IsVisible="{Binding ShowsOneAgent}">
+                            <StackPanel Spacing="4">
+                                <ItemsControl ItemsSource="{Binding CapabilityOptions}"
+                                              ItemsPanel="{StaticResource WrapItems}"
+                                              ItemTemplate="{StaticResource CheckItem}" />
+                                <TextBlock Classes="meta" TextWrapping="Wrap" Text="{Binding AgentHelp}" />
+                            </StackPanel>
+                        </HeaderedContentControl>
+                        <Grid ColumnDefinitions="*,2*" IsVisible="{Binding ShowsSelect}">
+                            <HeaderedContentControl Grid.Column="0" Header="Choose the agent" Margin="0,0,6,0">
+                                <ComboBox ItemsSource="{x:Static dc:AgentStepDetailsDataContext.SelectChoices}"
+                                          SelectedItem="{Binding Select}" HorizontalAlignment="Stretch" />
+                            </HeaderedContentControl>
+                            <TextBlock Grid.Column="1" Classes="meta" TextWrapping="Wrap" VerticalAlignment="Bottom"
+                                       Margin="0,0,0,6"
+                                       Text="ai: the run's main agent picks one and says why. first: the first that qualifies, in your preference order. (default): Settings › Execution." />
+                        </Grid>
+                        <CheckBox Content="The AI may hand sub-tasks to other agents while it works" IsChecked="{Binding Delegate}"
+                                  IsVisible="{Binding ShowsDelegate}" />
+                        <HeaderedContentControl Header="Agents it hands work to must have (optional)"
+                                                IsVisible="{Binding ShowsDelegateCapabilities}">
+                            <ItemsControl ItemsSource="{Binding DelegateCapabilityOptions}"
+                                          ItemsPanel="{StaticResource WrapItems}"
+                                          ItemTemplate="{StaticResource CheckItem}" />
+                        </HeaderedContentControl>
+                        <HeaderedContentControl Header="MCP servers given to the agent as extra tools">
+                            <StackPanel Spacing="4">
+                                <ItemsControl ItemsSource="{Binding ServerOptions}"
+                                              ItemsPanel="{StaticResource WrapItems}"
+                                              ItemTemplate="{StaticResource CheckItem}" />
+                                <TextBlock Classes="meta" TextWrapping="Wrap"
+                                           Text="Only agents that can take servers (mcp-tools) can then do the step. Add servers in Settings › MCP servers." />
+                            </StackPanel>
+                        </HeaderedContentControl>
+                        <HeaderedContentControl Header="MCP servers given when available (optional)">
+                            <StackPanel Spacing="4">
+                                <ItemsControl ItemsSource="{Binding OptionalServerOptions}"
+                                              ItemsPanel="{StaticResource WrapItems}"
+                                              ItemTemplate="{StaticResource CheckItem}" />
+                                <TextBlock Classes="meta" TextWrapping="Wrap"
+                                           Text="Given to the agent when they're set up on this machine and it can take servers; otherwise the step goes on without them, with a note." />
+                            </StackPanel>
+                        </HeaderedContentControl>
+                        <HeaderedContentControl Header="Skills given to the agent">
+                            <StackPanel Spacing="4">
+                                <ContentControl Content="{Binding Skills}" ContentTemplate="{StaticResource PickList}" />
+                                <TextBlock Classes="meta" TextWrapping="Wrap"
+                                           Text="Common skills, on top of any the workflow gives every step. Claude Code gets them as skills it invokes first; other agents get them in their prompt. Add skills under Skills." />
+                            </StackPanel>
+                        </HeaderedContentControl>
+                        <HeaderedContentControl Header="Workflow skills this step skips">
+                            <StackPanel Spacing="4">
+                                <ContentControl Content="{Binding SkipSkills}" ContentTemplate="{StaticResource PickList}" />
+                                <TextBlock Classes="meta" TextWrapping="Wrap"
+                                           Text="Skills the workflow gives every step that this one goes without, e.g. a terse style on a step that writes a document for people." />
+                            </StackPanel>
+                        </HeaderedContentControl>
+                        <CheckBox Content="The AI may file tickets (GitHub or Jira issues) while it works" IsChecked="{Binding CreateTickets}"
+                                  IsVisible="{Binding ShowsCreateTickets}"
+                                  ToolTip.Tip="Tickets go to the run's ticket source, else the repo's linked Jira project, else its GitHub repo" />
+                    </StackPanel>
+                </Border>
+    
+                <!-- Several agents -->
+                <Border Classes="step" IsVisible="{Binding ShowsSeveralAgents}">
+                    <StackPanel Spacing="6">
+                        <TextBlock Classes="meta" TextWrapping="Wrap"
+                                   Text="Each agent does the step in its own session (they share the repo, so this suits read-only work best). Later steps can use one agent's result as {{steps.&lt;step&gt;.candidates.&lt;agent&gt;}}." />
+                        <HeaderedContentControl Header="Agents (pick two or more)">
+                            <ItemsControl ItemsSource="{Binding AgentOptions}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><WrapPanel ItemSpacing="16" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="{x:Type dc:SelectableItem, x:TypeArguments=x:String}">
+                                        <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </HeaderedContentControl>
+                        <Grid ColumnDefinitions="*,*,*">
+                            <HeaderedContentControl Grid.Column="0" Header="Combine results" Margin="0,0,6,0">
+                                <ComboBox ItemsSource="{x:Static dc:AgentStepDetailsDataContext.CombineChoices}"
+                                          SelectedItem="{Binding Combine}" HorizontalAlignment="Stretch"
+                                          ToolTip.Tip="choose (default): you pick one or merge them. merge: an agent merges them. all: keep every result." />
+                            </HeaderedContentControl>
+                            <HeaderedContentControl Grid.Column="1" Header="Merge agent" Margin="0,0,6,0"
+                                                    IsVisible="{Binding ShowsMerge}">
+                                <ComboBox ItemsSource="{Binding MergeAgentChoices}" SelectedItem="{Binding MergeAgent}"
+                                          HorizontalAlignment="Stretch" />
+                            </HeaderedContentControl>
+                        </Grid>
+                        <HeaderedContentControl Header="Merge prompt (optional; {{candidates}} is every result)"
+                                                IsVisible="{Binding ShowsMerge}">
+                            <TextBox Text="{Binding MergePrompt}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60"
+                                     FontFamily="{StaticResource MonoFont}" FontSize="12"
+                                     PlaceholderText="Leave empty to use the step's prompt with merge instructions" />
+                        </HeaderedContentControl>
+                    </StackPanel>
+                </Border>
+    
+                    <CheckBox Content="The AI may ask its own questions while it works" IsChecked="{Binding Ask}"
+                              IsVisible="{Binding ShowsAsk}" />
+            </StackPanel>
+        </DataTemplate>
+        <DataTemplate x:DataType="dc:UserStepDetailsDataContext">
+            <HeaderedContentControl Header="Instructions (what you need to do)">
+                <TextBox Text="{Binding Instructions}" PlaceholderText="{Binding InstructionsPlaceholder}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="160"
+                         FontFamily="{StaticResource MonoFont}" FontSize="12" />
+            </HeaderedContentControl>
+        </DataTemplate>
+    </niddy:Page.DataTemplates>
+
+    <Grid ColumnDefinitions="280,*" RowDefinitions="Auto,*">
+
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Classes="error" Text="{Binding ErrorMessage}"
+                   IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+        <!-- Workflows in every scope -->
+        <DockPanel Grid.Row="1" Grid.Column="0" Margin="0,0,6,0">
+            <WrapPanel DockPanel.Dock="Bottom" ItemSpacing="6" LineSpacing="6" Margin="0,8,0,0">
+                <Button Classes="accent" Content="{Binding NewLabel, StringFormat='{}{0}…'}" Click="OnNew" />
+                <Button Content="Duplicate…" Click="OnDuplicate" IsEnabled="{Binding HasDraft}" />
+                <Button Content="Delete…" Click="OnDelete" IsEnabled="{Binding CanDelete}" />
+            </WrapPanel>
+
+            <!-- Search and filters -->
+            <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,8">
+                <TextBox x:Name="SearchBox" Text="{Binding SearchText}" PlaceholderText="Search name or contents" />
+                <Grid ColumnDefinitions="Auto,*">
+                    <CheckBox Grid.Column="0" Content="Contents" IsChecked="{Binding SearchContents}" Margin="0,0,8,0"
+                              ToolTip.Tip="Also search prompts, instructions and files, not just the id, name, description and tags" />
+                    <ComboBox Grid.Column="1" ItemsSource="{Binding ScopeChoices}" SelectedItem="{Binding ScopeFilter}"
+                              HorizontalAlignment="Stretch" />
+                </Grid>
+                <views:TagFilterView DataContext="{Binding Tags}" />
+                <DockPanel>
+                    <Button DockPanel.Dock="Right" Content="Clear" Click="OnClearFilters" IsVisible="{Binding IsFiltered}"
+                            Padding="8,2" />
+                    <TextBlock Classes="meta" VerticalAlignment="Center" Text="{Binding FilterSummary, StringFormat='{}{0} shown'}" />
+                </DockPanel>
+            </StackPanel>
+
+            <ListBox ItemsSource="{Binding Listings}" SelectedItem="{Binding SelectedListing}"
+                     views:RowMenus.IsEnabled="True">
+                <ListBox.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Duplicate…" Click="OnDuplicate" IsEnabled="{Binding HasDraft}" />
+                        <MenuItem Header="Copy id" Click="OnCopyListingId" />
+                        <Separator />
+                        <MenuItem Header="Delete…" Click="OnDelete" IsEnabled="{Binding CanDelete}" />
+                    </ContextMenu>
+                </ListBox.ContextMenu>
+                <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="dc:LibraryEntry">
+                        <StackPanel>
+                            <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                            <TextBlock Classes="meta">
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{x:Static dc:UiConverters.MetaLine}">
+                                        <Binding Path="Id" />
+                                        <Binding Path="Scope" />
+                                        <Binding Path="Summary" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                            <TextBlock Classes="meta" IsVisible="{Binding HasTags}" TextTrimming="CharacterEllipsis"
+                                       Text="{Binding TagLine}" />
+                            <TextBlock Classes="meta" IsVisible="{Binding HasMatchNote}" TextWrapping="Wrap" MaxLines="2"
+                                       FontStyle="Italic" Text="{Binding MatchNote, StringFormat='{}found: {0}'}" />
+                        </StackPanel>
+                    </DataTemplate>
+                </ListBox.ItemTemplate>
+            </ListBox>
+        </DockPanel>
+
+        <!-- Draft -->
+        <Border Grid.Row="1" Grid.Column="1" Margin="6,0,0,0" Classes="card">
+            <Panel>
+                <TextBlock Text="Select one or create a new one" Classes="hint" HorizontalAlignment="Center"
+                           VerticalAlignment="Center" IsVisible="{Binding !HasDraft}" />
+                <Grid RowDefinitions="Auto,Auto,*,Auto" IsVisible="{Binding HasDraft}">
+
+                    <!-- Workflow fields -->
+                    <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,8">
+                    <Grid ColumnDefinitions="*,2*" RowDefinitions="Auto,Auto">
+                        <HeaderedContentControl Grid.Column="0" Header="Id (file name)" Margin="0,0,8,0">
+                            <TextBox Text="{Binding DraftId}" />
+                        </HeaderedContentControl>
+                        <HeaderedContentControl Grid.Column="1" Header="Name">
+                            <TextBox Text="{Binding DraftName}" />
+                        </HeaderedContentControl>
+                        <HeaderedContentControl Grid.Row="1" Grid.Column="0" Header="Tags (comma-separated)" Margin="0,6,8,0">
+                            <TextBox Text="{Binding DraftTags}" PlaceholderText="review, planning" />
+                        </HeaderedContentControl>
+                        <HeaderedContentControl Grid.Row="1" Grid.Column="1" Header="Description" Margin="0,6,0,0">
+                            <TextBox Text="{Binding DraftDescription}" />
+                        </HeaderedContentControl>
+                    </Grid>
+
+                    <!-- Parameters and requirements -->
+                    <HeaderedContentControl Header="Skills every AI step gets" IsVisible="{Binding HasDefaultSkills}">
+                        <StackPanel Spacing="2">
+                            <ContentControl Content="{Binding Skills}" ContentTemplate="{StaticResource PickList}" />
+                            <TextBlock Classes="meta" TextWrapping="Wrap" IsVisible="{Binding !Skills.HasChoices}"
+                                       Text="No skills yet; add one under Skills." />
+                            <TextBlock Classes="meta" TextWrapping="Wrap"
+                                       Text="Added to the skills of every AI and interactive step, including included workflows' steps. An entry can be {{params.&lt;id&gt;}}; an empty one gives no skill." />
+                        </StackPanel>
+                    </HeaderedContentControl>
+
+                    <Expander HorizontalAlignment="Stretch" x:Name="ParametersExpander" IsVisible="{Binding HasParameters}">
+                        <Expander.Header>
+                            <TextBlock Text="{Binding PartsHeader}" />
+                        </Expander.Header>
+                        <StackPanel Spacing="8">
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Add parameter" Click="OnAddParameter" />
+                                <StackPanel>
+                                    <TextBlock Classes="h2" Text="Parameters" />
+                                    <TextBlock Classes="meta" TextWrapping="Wrap"
+                                               Text="Values filled in wherever this is used (with), or when a run starts. Write them as {{params.&lt;id&gt;}}; they're replaced as text before the run begins." />
+                                </StackPanel>
+                            </DockPanel>
+                            <ItemsControl ItemsSource="{Binding Parameters}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="dc:ParameterDraftDataContext">
+                                        <Border Classes="step">
+                                            <Grid ColumnDefinitions="*,*,*,Auto" RowDefinitions="Auto,Auto">
+                                                <HeaderedContentControl Grid.Column="0" Header="Id" Margin="0,0,6,0">
+                                                    <TextBox Text="{Binding Id}" />
+                                                </HeaderedContentControl>
+                                                <HeaderedContentControl Grid.Column="1" Header="Label" Margin="0,0,6,0">
+                                                    <TextBox Text="{Binding Label}" PlaceholderText="(the id)" />
+                                                </HeaderedContentControl>
+                                                <HeaderedContentControl Grid.Column="2" Header="Default" Margin="0,0,6,0">
+                                                    <TextBox Text="{Binding Default}" IsEnabled="{Binding HasDefault}"
+                                                             PlaceholderText="(empty)" />
+                                                </HeaderedContentControl>
+                                                <StackPanel Grid.Column="3" Spacing="4" VerticalAlignment="Bottom">
+                                                    <CheckBox Content="Required" IsChecked="{Binding Required}" />
+                                                    <Button Content="Remove" Click="OnRemoveParameter" />
+                                                </StackPanel>
+                                                <HeaderedContentControl Grid.Row="1" Grid.ColumnSpan="4" Header="Description" Margin="0,6,0,0">
+                                                    <TextBox Text="{Binding Description}" PlaceholderText="What it's for (optional)" />
+                                                </HeaderedContentControl>
+                                            </Grid>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+
+                            <StackPanel Spacing="6" IsVisible="{Binding HasRequirements}">
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Content="Add requirement" Click="OnAddRequirement" />
+                                    <StackPanel>
+                                        <TextBlock Classes="h2" Text="Requires" />
+                                        <TextBlock Classes="meta" TextWrapping="Wrap"
+                                                   Text="Workflows that must have finished on the ticket first. A finished run is used as it is, an unfinished one is waited on, otherwise one is started. Each shows as a requires-&lt;workflow&gt; step at the start of the run." />
+                                    </StackPanel>
+                                </DockPanel>
+                                <ItemsControl ItemsSource="{Binding Requires}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="dc:RequirementDraftDataContext">
+                                            <Border Classes="step">
+                                                <StackPanel Spacing="6">
+                                                    <DockPanel>
+                                                        <Button DockPanel.Dock="Right" Content="Remove" Click="OnRemoveRequirement" />
+                                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                                            <TextBlock Text="Workflow" VerticalAlignment="Center" />
+                                                            <ComboBox ItemsSource="{Binding WorkflowChoices}" SelectedItem="{Binding Workflow}"
+                                                                      MinWidth="180" />
+                                                        </StackPanel>
+                                                    </DockPanel>
+                                                    <ContentControl Content="{Binding With}" />
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </StackPanel>
+                    </Expander>
+                    </StackPanel>
+
+                    <TextBlock Grid.Row="1" Classes="h2" Text="Steps" IsVisible="{Binding HasSteps}" />
+                    <TextBlock Grid.Row="1" Classes="h2" Text="Step" IsVisible="{Binding ShowsSingleStepHeader}" />
+                    <TextBlock Grid.Row="1" Classes="h2" Text="Instructions" IsVisible="{Binding HasContent}" />
+
+                    <!-- Skill content and files -->
+                    <ScrollViewer Grid.Row="2" IsVisible="{Binding HasContent}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Classes="meta" TextWrapping="Wrap"
+                                       Text="The body of the skill's SKILL.md, in markdown; the description above is what an agent reads to decide when it applies. Claude Code gets it as a skill; other agents get it in their prompt." />
+                            <views:MarkdownView IsEditable="True" Markdown="{Binding DraftContent}" Title="SKILL.md"
+                                                MinHeight="240" />
+                            <DockPanel>
+                                <Button DockPanel.Dock="Right" Content="Add file" Click="OnAddFile" />
+                                <StackPanel>
+                                    <TextBlock Classes="h2" Text="Files" />
+                                    <TextBlock Classes="meta" TextWrapping="Wrap"
+                                               Text="Supporting text files next to the SKILL.md, which the instructions can point to by their path." />
+                                </StackPanel>
+                            </DockPanel>
+                            <ItemsControl ItemsSource="{Binding Files}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="dc:SkillFileDraftDataContext">
+                                        <Border Classes="step">
+                                            <StackPanel Spacing="6">
+                                                <DockPanel>
+                                                    <Button DockPanel.Dock="Right" Content="Remove" Click="OnRemoveFile" Margin="6,0,0,0" />
+                                                    <TextBox Text="{Binding Path}" PlaceholderText="e.g. reference.md" />
+                                                </DockPanel>
+                                                <TextBox Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="100"
+                                                         FontFamily="{StaticResource MonoFont}" FontSize="12" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                    </ScrollViewer>
+
+                    <Grid Grid.Row="2" ColumnDefinitions="*,Auto" IsVisible="{Binding ShowsStepArea}"
+                          Classes.single="{Binding !HasSteps}">
+                        <Grid.Styles>
+                            <!-- Beside the flow, the properties are a closable card; a common step has no flow, so its
+                                 properties take the whole width -->
+                            <Style Selector="Grid:not(.single) > Border#StepPanel">
+                                <Setter Property="Grid.Column" Value="1" />
+                                <Setter Property="Width" Value="420" />
+                                <Setter Property="Margin" Value="8,0,0,0" />
+                                <Setter Property="Padding" Value="12,10" />
+                                <Setter Property="CornerRadius" Value="6" />
+                                <Setter Property="BorderThickness" Value="1" />
+                                <Setter Property="BorderBrush" Value="{DynamicResource SystemControlBackgroundBaseLowBrush}" />
+                                <Setter Property="Background" Value="{DynamicResource SystemControlBackgroundAltHighBrush}" />
+                            </Style>
+                            <Style Selector="Grid.single > Border#StepPanel">
+                                <Setter Property="Grid.ColumnSpan" Value="2" />
+                            </Style>
+                        </Grid.Styles>
+
+                        <!-- The flow: the steps as nodes and arrows, filling the area -->
+                        <Panel Grid.Column="0" IsVisible="{Binding HasSteps}">
+                            <views:FlowEditorView x:Name="FlowEditor" DataContext="{Binding Flow}" />
+                        </Panel>
+
+                        <!-- The selected step's properties, opened by clicking its node -->
+                        <Border x:Name="StepPanel" IsVisible="{Binding ShowsStepPanel}">
+                        <DockPanel>
+                            <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8" IsVisible="{Binding HasSteps}">
+                                <Button DockPanel.Dock="Right" Content="✕" Click="OnCloseStepPanel" Padding="8,2"
+                                        Background="Transparent" ToolTip.Tip="Close the step's properties" />
+                                <TextBlock Text="{Binding SelectedStep.Name, FallbackValue=''}" FontSize="15" FontWeight="SemiBold"
+                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                            <WrapPanel DockPanel.Dock="Top" ItemSpacing="4" LineSpacing="4" Margin="0,0,0,6"
+                                       IsVisible="{Binding HasSteps}">
+                                <Button Content="Remove" Click="OnRemoveStep"
+                                        IsEnabled="{Binding SelectedStep, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                <Button Content="Save as common…" Click="OnSaveAsCommon"
+                                        IsEnabled="{Binding SelectedStep.CanSaveAsCommon, FallbackValue=False}"
+                                        ToolTip.Tip="Save this step to the common steps and base it on that, so other workflows can use it too" />
+                                <Button Content="Copy into workflow" Click="OnCopyIntoWorkflow"
+                                        IsEnabled="{Binding SelectedStep.IsComposedStep, FallbackValue=False}"
+                                        ToolTip.Tip="Replace this step with the steps it stands for, written out here so you can edit them" />
+                            </WrapPanel>
+
+                            <!-- Variables -->
+                            <Expander DockPanel.Dock="Bottom" Header="Variables" Margin="0,6,0,0" HorizontalAlignment="Stretch">
+                                <DockPanel>
+                                    <TextBlock DockPanel.Dock="Top" Classes="meta" TextWrapping="Wrap"
+                                               Text="Variables this step can use. Double-click to copy." />
+                                    <ListBox ItemsSource="{Binding Variables}" DoubleTapped="OnCopyVariable" x:Name="VariableList"
+                                             MaxHeight="220">
+                                        <ListBox.ItemTemplate>
+                                            <DataTemplate x:DataType="x:String">
+                                                <TextBlock Text="{Binding}" FontFamily="{StaticResource MonoFont}" FontSize="12" />
+                                            </DataTemplate>
+                                        </ListBox.ItemTemplate>
+                                    </ListBox>
+                                </DockPanel>
+                            </Expander>
+
+                            <Panel>
+                        <ScrollViewer
+                                      IsVisible="{Binding SelectedStep, Converter={x:Static ObjectConverters.IsNotNull}}">
+                            <StackPanel Spacing="6" DataContext="{Binding SelectedStep}" x:DataType="dc:StepDraftDataContext">
+                                <!-- What the step is: its own, a common step's, or another workflow's steps -->
+                                <StackPanel Spacing="4" IsVisible="{Binding $parent[niddy:Page].((dc:LibraryPageDataContext)DataContext).HasSteps, FallbackValue=False}">
+                                    <Grid ColumnDefinitions="*,2*">
+                                        <HeaderedContentControl Grid.Column="0" Header="The step is" Margin="0,0,6,0">
+                                            <ComboBox ItemsSource="{x:Static dc:StepDraftDataContext.BasisChoices}"
+                                                      SelectedItem="{Binding Basis}" HorizontalAlignment="Stretch" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Grid.Column="1" Header="Common step" IsVisible="{Binding IsUse}">
+                                            <ComboBox ItemsSource="{Binding CommonStepChoices}" SelectedItem="{Binding Use}"
+                                                      HorizontalAlignment="Stretch" />
+                                        </HeaderedContentControl>
+                                        <HeaderedContentControl Grid.Column="1" Header="Workflow to include" IsVisible="{Binding IsInclude}">
+                                            <ComboBox ItemsSource="{Binding WorkflowChoices}" SelectedItem="{Binding Include}"
+                                                      HorizontalAlignment="Stretch" />
+                                        </HeaderedContentControl>
+                                    </Grid>
+                                    <TextBlock Classes="meta" TextWrapping="Wrap" Text="{Binding BasisHelp}"
+                                               IsVisible="{Binding !IsOwnStep}" />
+                                </StackPanel>
+                                <Button Content="{Binding ViewReferencedLabel}" Click="OnViewReferenced" HorizontalAlignment="Left"
+                                        IsVisible="{Binding ShowsViewReferenced}" IsEnabled="{Binding CanViewReferenced}"
+                                        ToolTip.Tip="Open what this step stands for, to see or edit what it does" />
+                                <Grid ColumnDefinitions="*,*,*">
+                                    <HeaderedContentControl Grid.Column="0" Header="Id" Margin="0,0,6,0">
+                                        <TextBox Text="{Binding Id}" />
+                                    </HeaderedContentControl>
+                                    <HeaderedContentControl Grid.Column="1" Header="Name" Margin="0,0,6,0">
+                                        <TextBox Text="{Binding Name}" PlaceholderText="{Binding NamePlaceholder}" />
+                                    </HeaderedContentControl>
+                                    <HeaderedContentControl Grid.Column="2" Header="Type" IsVisible="{Binding IsOwnStep}">
+                                        <ComboBox ItemsSource="{x:Static dc:StepDraftDataContext.StepTypes}" IsEnabled="{Binding IsOwnStep}"
+                                                  SelectedItem="{Binding StepType}" HorizontalAlignment="Stretch" />
+                                    </HeaderedContentControl>
+                                </Grid>
+
+                                <!-- Parameter values for the common step or included workflow -->
+                                <HeaderedContentControl Header="Parameter values" IsVisible="{Binding ShowsComposedWith}">
+                                    <StackPanel Spacing="2">
+                                        <ContentControl Content="{Binding With}" />
+                                        <TextBlock Classes="meta" TextWrapping="Wrap" Text="{Binding WithHelp}"
+                                                   IsVisible="{Binding With.HasValues}" />
+                                    </StackPanel>
+                                </HeaderedContentControl>
+
+                                <ContentControl Content="{Binding}" ContentTemplate="{StaticResource StepFields}" IsVisible="{Binding IsOwnStep}" />
+
+                                <!-- Flow: arrows, waiting, retry -->
+                                <Expander Header="{Binding FlowSummary}" HorizontalAlignment="Stretch" Margin="0,6,0,0">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Classes="meta" TextWrapping="Wrap"
+                                                   Text="Once the step ends, its arrows say where the run goes: arrows back (loops) are checked first, then every arrow forward that fires on how it ended and whose condition holds, all at once unless the step follows only the first. A step with no arrow on ends its path. Steps the run never reaches have empty outputs. A loop can use {{loop.iteration}} and {{steps.&lt;step&gt;.previous}} (the last attempt's output)." />
+
+                                        <!-- Optional -->
+                                        <CheckBox Content="Optional: whoever starts a run chooses whether to include it" IsChecked="{Binding IsOptional}"
+                                                  IsVisible="{Binding ShowsStepFields}" />
+                                        <Border Classes="step" IsVisible="{Binding IsOptional}">
+                                            <StackPanel Spacing="6">
+                                                <CheckBox Content="Included by default" IsChecked="{Binding OptionalDefault}" />
+                                                <HeaderedContentControl Header="What to tell them (optional)">
+                                                    <TextBox Text="{Binding OptionalHelp}" TextWrapping="Wrap"
+                                                             PlaceholderText="e.g. Worth it when the change touches production config" />
+                                                </HeaderedContentControl>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <!-- Arrows out -->
+                                        <DockPanel>
+                                            <Button DockPanel.Dock="Right" Content="Add arrow" Click="OnAddArrow" />
+                                            <TextBlock Classes="h2" Text="Arrows out" VerticalAlignment="Center" />
+                                        </DockPanel>
+                                        <CheckBox Content="Follow only the first arrow that holds (in this order)" IsChecked="{Binding FollowsFirst}"
+                                                  IsVisible="{Binding ShowsStepFields}"
+                                                  ToolTip.Tip="Otherwise every arrow that applies is followed, and several run in parallel." />
+                                        <ItemsControl ItemsSource="{Binding Arrows}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="dc:ArrowDraftDataContext">
+                                                    <Border Classes="step">
+                                                        <StackPanel Spacing="6">
+                                                            <DockPanel>
+                                                                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4">
+                                                                    <Button Content="↑" Click="OnMoveArrowUp" ToolTip.Tip="Move up" />
+                                                                    <Button Content="↓" Click="OnMoveArrowDown" ToolTip.Tip="Move down" />
+                                                                    <Button Content="Remove" Click="OnRemoveArrow" />
+                                                                </StackPanel>
+                                                                <WrapPanel Orientation="Horizontal">
+                                                                    <TextBlock Text="Go to" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                                    <ComboBox ItemsSource="{Binding ToChoices}" SelectedItem="{Binding To}" MinWidth="140" Margin="0,0,8,0" />
+                                                                    <TextBlock Text="on" VerticalAlignment="Center" Margin="0,0,8,0" />
+                                                                    <ComboBox ItemsSource="{x:Static dc:ArrowDraftDataContext.OnChoices}" SelectedItem="{Binding On}"
+                                                                              MinWidth="100" Margin="0,0,8,0" />
+                                                                    <ComboBox ItemsSource="{x:Static dc:ArrowDraftDataContext.ConditionModes}"
+                                                                              SelectedItem="{Binding ConditionMode}" MinWidth="100" />
+                                                                </WrapPanel>
+                                                            </DockPanel>
+                                                            <ContentControl Content="{Binding Condition}" IsVisible="{Binding HasCondition}" />
+                                                            <Grid ColumnDefinitions="*,Auto,*">
+                                                                <HeaderedContentControl Grid.Column="0" Header="At most (times, arrows back only)" Margin="0,0,6,0">
+                                                                    <NumericUpDown Value="{Binding Max}" Minimum="1" Maximum="100" Increment="1" FormatString="0"
+                                                                                   PlaceholderText="5" />
+                                                                </HeaderedContentControl>
+                                                                <CheckBox Grid.Column="1" Content="move on at the limit" IsChecked="{Binding MoveOnAtLimit}"
+                                                                          VerticalAlignment="Bottom" Margin="0,0,6,0"
+                                                                          ToolTip.Tip="At the limit, treat the arrow as not taken instead of failing the step." />
+                                                                <HeaderedContentControl Grid.Column="2" Header="Label (optional)">
+                                                                    <TextBox Text="{Binding Label}" PlaceholderText="shown on the graph" />
+                                                                </HeaderedContentControl>
+                                                            </Grid>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+
+                                        <!-- What a step written out here or based on a common step adds; an include only has arrows -->
+                                        <StackPanel Spacing="8" IsVisible="{Binding ShowsStepFields}">
+                                            <!-- Parallel paths -->
+                                            <Border Classes="step" IsVisible="{Binding IsFork}">
+                                                <StackPanel Spacing="6">
+                                                    <TextBlock Classes="meta" TextWrapping="Wrap"
+                                                               Text="The step's arrows start paths that run at the same time, until they meet at a step that waits for them." />
+                                                    <HeaderedContentControl Header="Paths work in">
+                                                        <ComboBox ItemsSource="{x:Static dc:StepDraftDataContext.WorkspaceChoices}"
+                                                                  SelectedItem="{Binding Workspace}" HorizontalAlignment="Stretch"
+                                                                  ToolTip.Tip="shared (default): the run's checkout. worktree: each path gets its own git worktree, merged back where the paths meet." />
+                                                    </HeaderedContentControl>
+                                                    <CheckBox Content="Merge each path's work back where they meet" IsChecked="{Binding MergeBack}"
+                                                              IsVisible="{Binding ShowsMergeBack}"
+                                                              ToolTip.Tip="Untick to keep each path unmerged. A merge that conflicts fails the step, keeping the branch and worktree for you to resolve." />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Waiting -->
+                                            <Border Classes="step" IsVisible="{Binding ShowsWaitFor}">
+                                                <StackPanel Spacing="6">
+                                                    <TextBlock Classes="h2" Text="Waits for" />
+                                                    <TextBlock Classes="hint" TextWrapping="Wrap" Text="Arrows from several steps lead here. The step starts once the rule below holds." />
+                                                    <Grid ColumnDefinitions="*,*">
+                                                        <HeaderedContentControl Grid.Column="0" Header="Start once" Margin="0,0,6,0">
+                                                            <ComboBox ItemsSource="{x:Static dc:StepDraftDataContext.WaitChoices}" SelectedItem="{Binding WaitChoice}"
+                                                                      HorizontalAlignment="Stretch"
+                                                                      ToolTip.Tip="all (default): every path that can still get here has. any: the first has. custom: a group of your own, e.g. all of build and test, or any of docs." />
+                                                        </HeaderedContentControl>
+                                                        <CheckBox Grid.Column="1" Content="Let the other paths finish" IsChecked="{Binding LetsOthersFinish}"
+                                                                  VerticalAlignment="Bottom"
+                                                                  ToolTip.Tip="Otherwise the paths still on their way here are cancelled once the step starts." />
+                                                    </Grid>
+                                                    <ContentControl Content="{Binding WaitGroup}" IsVisible="{Binding ShowsWaitGroup}" />
+                                                </StackPanel>
+                                            </Border>
+
+                                            <!-- Retry and timeout -->
+                                            <Grid ColumnDefinitions="*,*,*">
+                                                <HeaderedContentControl Grid.Column="0" Header="Retry when it fails (times)" Margin="0,0,6,0">
+                                                    <NumericUpDown Value="{Binding RetryMax}" Minimum="1" Maximum="20" Increment="1" FormatString="0"
+                                                                   PlaceholderText="no retry" />
+                                                </HeaderedContentControl>
+                                                <HeaderedContentControl Grid.Column="1" Header="Between retries" Margin="0,0,6,0">
+                                                    <TextBox Text="{Binding RetryDelay}" PlaceholderText="e.g. 30s" />
+                                                </HeaderedContentControl>
+                                                <HeaderedContentControl Grid.Column="2" Header="Time limit">
+                                                    <TextBox Text="{Binding Timeout}" PlaceholderText="e.g. 30m" />
+                                                </HeaderedContentControl>
+                                            </Grid>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Expander>
+                                <Expander Header="{Binding OverridesHeader}" IsVisible="{Binding IsUse}" HorizontalAlignment="Stretch">
+                                    <StackPanel Spacing="6">
+                                        <TextBlock Classes="meta" TextWrapping="Wrap"
+                                                   Text="What the step does comes from the common step (View common step opens it). Anything filled in here overrides it for this workflow only." />
+                                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource StepFields}" />
+                                    </StackPanel>
+                                </Expander>
+                            </StackPanel>
+                        </ScrollViewer>
+
+                            </Panel>
+                        </DockPanel>
+                        </Border>
+                    </Grid>
+
+                    <!-- Validation and save -->
+                    <StackPanel Grid.Row="3" Spacing="6" Margin="0,10,0,0">
+                        <ItemsControl ItemsSource="{Binding Errors}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <TextBlock Classes="error" Margin="0" TextWrapping="Wrap" Text="{Binding}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <ItemsControl ItemsSource="{Binding Warnings}">
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <TextBlock Classes="meta" Margin="0" TextWrapping="Wrap" Text="{Binding StringFormat='⚠ {0}'}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBlock Classes="ok" Text="Valid" IsVisible="{Binding IsValid}" />
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ComboBox ItemsSource="{Binding SaveScopes}" SelectedItem="{Binding SaveScope}" MinWidth="100" />
+                            <Button Content="↶" Click="OnUndo" IsEnabled="{Binding CanUndo}" ToolTip.Tip="Undo (⌘Z)" />
+                            <Button Content="↷" Click="OnRedo" IsEnabled="{Binding CanRedo}" ToolTip.Tip="Redo (⇧⌘Z)" />
+                            <Button Classes="accent" Content="Save" Click="OnSave" IsEnabled="{Binding IsValid}" />
+                            <TextBlock Classes="meta" VerticalAlignment="Center" Text="Unsaved changes" IsVisible="{Binding IsDirty}" />
+                        </StackPanel>
+                        <TextBlock Classes="meta" TextTrimming="PathSegmentEllipsis"
+                                   Text="{Binding SavePath, StringFormat='Saves to {0}'}" />
+                    </StackPanel>
+                </Grid>
+            </Panel>
+        </Border>
+    </Grid>
+</niddy:Page>

@@ -1,0 +1,32 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.2",
+  "id": "benchmarkdotnet",
+  "name": "Benchmarking with BenchmarkDotNet",
+  "description": "Measure .NET performance with BenchmarkDotNet: a separate Release-built benchmark project, a baseline to compare against, memory diagnostics, realistic inputs, and results reported with their error and allocations. Use when a step claims or needs to check that .NET code is faster or allocates less.",
+  "tags": [
+    "dotnet",
+    "performance",
+    "benchmarking"
+  ],
+  "recommend": {
+    "files": [
+      {
+        "glob": "*.csproj",
+        "contains": "BenchmarkDotNet"
+      },
+      {
+        "glob": "Directory.Packages.props",
+        "contains": "BenchmarkDotNet"
+      }
+    ],
+    "languages": [
+      "csharp"
+    ],
+    "frameworks": [
+      "benchmarkdotnet"
+    ],
+    "reason": "Uses BenchmarkDotNet"
+  },
+  "content": "# Benchmarking with BenchmarkDotNet\n\nDon't claim something is faster without measuring it, and don't measure with a `Stopwatch` loop.\n\n## Setup\n\n- A separate console project (e.g. `benchmarks/Afl.Benchmarks`) referencing the code under test, with the `BenchmarkDotNet` package. Its `Main` is `BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);`.\n- Always run in Release, outside the debugger: `dotnet run -c Release --project benchmarks/Afl.Benchmarks -- --filter '*Parser*'`.\n- While iterating, `--job short` gives quick, rougher numbers; do the final comparison with the default job.\n\n## Writing a benchmark\n\n```csharp\n[MemoryDiagnoser]\npublic class ParserBenchmarks\n{\n    private string _input = string.Empty;\n\n    [Params(10, 1_000)]\n    public int Lines { get; set; }\n\n    [GlobalSetup]\n    public void Setup() => this._input = SampleData.Lines(this.Lines);\n\n    [Benchmark(Baseline = true)]\n    public Document Current() => OldParser.Parse(this._input);\n\n    [Benchmark]\n    public Document Proposed() => NewParser.Parse(this._input);\n}\n```\n\n- **Return the result** (or feed it to a `Consumer`) so the JIT can't throw the work away.\n- Do setup in `[GlobalSetup]`/`[IterationSetup]`, never inside the benchmark method.\n- Mark the current code as the `Baseline` so the report shows a ratio.\n- Use `[Params]` for the input sizes that matter in real use, including small ones; a win at 1M items can be a loss at 10.\n- Keep each benchmark to one operation. A benchmark that does I/O, logging or network calls measures those, not your code.\n\n## Reading results\n\n- Report Mean with its Error/StdDev, the Ratio to the baseline, and Allocated. A difference inside the error bars is noise.\n- Watch for bimodal results or big StdDev: something else is running, or the benchmark has a hidden branch.\n- Re-run once to confirm a surprising result before acting on it.\n- Microbenchmarks show where the code is cheaper, not that the app is faster; for that, measure the app (profiling or load tests), which is a different job.\n"
+}

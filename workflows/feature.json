@@ -1,0 +1,64 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "5.0",
+  "id": "feature",
+  "name": "Feature",
+  "description": "Take a ticket from understanding to an approved pull request.",
+  "tags": [
+    "feature",
+    "pull-request"
+  ],
+  "steps": [
+    {
+      "id": "understand",
+      "name": "Understand the ticket",
+      "type": "ai",
+      "permissionMode": "default",
+      "prompt": "You are starting work on {{ticket.key}}: {{ticket.title}}\n\n{{ticket.body}}\n\nRead the relevant parts of this repository and summarise: the problem, the likely scope of the change, and any open questions or unknowns. Do not change any files.",
+      "arrows": [
+        {
+          "to": "plan"
+        }
+      ]
+    },
+    {
+      "id": "plan",
+      "name": "Plan the change",
+      "type": "ai",
+      "advance": "approve",
+      "permissionMode": "default",
+      "prompt": "Propose an implementation plan for {{ticket.key}}: {{ticket.title}}.\n\nWhat we know so far:\n{{steps.understand.output}}\n\nList the files to change, the approach, the tests to add, and the acceptance criteria. Do not change any files yet.",
+      "arrows": [
+        {
+          "to": "implement"
+        }
+      ]
+    },
+    {
+      "id": "implement",
+      "name": "Implement",
+      "type": "interactive",
+      "prompt": "Implement {{ticket.key}}: {{ticket.title}} following this approved plan:\n\n{{steps.plan.output}}\n\nKeep the change scoped to the plan, add the tests it lists, and make sure the build and tests pass.",
+      "arrows": [
+        {
+          "to": "pr"
+        }
+      ]
+    },
+    {
+      "id": "pr",
+      "name": "Open a PR and get it reviewed",
+      "type": "user",
+      "instructions": "Open a pull request for {{ticket.key}} that links {{ticket.url}}, and get it reviewed and approved.",
+      "inputs": [
+        {
+          "id": "url",
+          "label": "Pull request URL",
+          "type": "text",
+          "required": false,
+          "help": "Recorded on the run so it links to the PR."
+        }
+      ]
+    }
+  ]
+}

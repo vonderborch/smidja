@@ -1,0 +1,54 @@
+{
+  "$schema": "./common-step.schema.json",
+  "schemaVersion": "2.0",
+  "id": "code-review",
+  "name": "Code review",
+  "description": "Reviews a change with several reviewers at once, each its own subagent (a reviewer child run): by default standards, specs and style, and security when you add it. Each reviewer is a review-<name> common step; add one to add a reviewer. The output has every reviewer's findings under its own heading, so a repeat or route can send the work back while any says VERDICT: CHANGES.",
+  "tags": [
+    "review",
+    "reviewer"
+  ],
+  "parameters": [
+    {
+      "id": "reviewers",
+      "label": "Reviewers",
+      "description": "Comma-separated: each is a review-<name> common step (built in: standards, specs, style, security).",
+      "default": "standards, specs, style"
+    },
+    {
+      "id": "scope",
+      "label": "What to review",
+      "description": "The work to review and where to find it.",
+      "default": "the uncommitted changes for {{ticket.key}} (look at git status and git diff HEAD, and read any new untracked files)"
+    },
+    {
+      "id": "context",
+      "label": "What the change is meant to do",
+      "description": "The ticket, requirements or specs to review against; templates such as {{steps.implement.output}} are fine.",
+      "default": "{{ticket.title}}\n\n{{ticket.body}}"
+    },
+    {
+      "id": "extra",
+      "label": "Anything else to check",
+      "description": "Extra instructions for this reviewer, e.g. what matters most for this kind of change.",
+      "default": ""
+    }
+  ],
+  "step": {
+    "id": "review",
+    "name": "Review the change",
+    "type": "workflow",
+    "workflow": "reviewer",
+    "forEach": {
+      "kind": "items",
+      "items": "{{params.reviewers}}"
+    },
+    "childrenTogether": true,
+    "with": {
+      "lens": "{{item}}",
+      "scope": "{{params.scope}}",
+      "context": "{{params.context}}",
+      "extra": "{{params.extra}}"
+    }
+  }
+}

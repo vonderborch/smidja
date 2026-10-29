@@ -1,0 +1,43 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dc="using:Afl.UI.DataContexts"
+             xmlns:wf="using:Afl.Core.Workflows"
+             xmlns:views="using:Afl.UI.Views"
+             x:Class="Afl.UI.Views.SkillPickerView"
+             x:DataType="dc:SkillPickerDataContext">
+    <ScrollViewer MaxHeight="600" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="10" Margin="0,0,16,0">
+            <!-- Recommended for the repo: ticking one adds it to the run's skills below -->
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="Change project info…" Click="OnChangeProject" />
+                <TextBlock FontWeight="SemiBold" Text="Recommended for this repo" VerticalAlignment="Center" />
+            </DockPanel>
+            <TextBlock Classes="meta" Text="{Binding StackText}" TextWrapping="Wrap" />
+            <TextBlock Classes="meta" Text="Nothing to recommend from the repo's files." IsVisible="{Binding !HasRecommended}"
+                       TextWrapping="Wrap" />
+            <ItemsControl ItemsSource="{Binding Recommended}" IsVisible="{Binding HasRecommended}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="{x:Type dc:SelectableItem, x:TypeArguments=wf:SkillRecommendation}">
+                        <CheckBox IsChecked="{Binding IsSelected}">
+                            <StackPanel>
+                                <TextBlock Text="{Binding Label}" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                <TextBlock Text="{Binding Value.Reason}" FontSize="12" TextWrapping="Wrap" />
+                                <TextBlock Classes="meta" Text="{Binding Value.Skill.Description}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </CheckBox>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+            <Button Content="Tick all" Click="OnTickAll" IsVisible="{Binding HasRecommended}" />
+
+            <!-- What the run gets: the workflow's skills to start with -->
+            <TextBlock FontWeight="SemiBold" Text="Skills for this run" Margin="0,6,0,0" />
+            <TextBlock Classes="meta" TextWrapping="Wrap"
+                       Text="Starts with the workflow's own. Steps' own skills and skipSkills still apply." />
+            <views:PickListView DataContext="{Binding Skills}" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

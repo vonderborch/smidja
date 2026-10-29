@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The built-in workflows and their schema, for WorkflowSchemaTests. -->
+    <None Include="..\..\..\workflows\*.json" Link="workflows\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\..\workflows\steps\*.json" Link="workflows\steps\%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" />
+    <!-- The built-in workflows' expanded steps from before they used common steps, for CompositionTests. -->
+    <None Include="Snapshots\*.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Afl.Core\Afl.Core.csproj" />
+  </ItemGroup>
+
+</Project>

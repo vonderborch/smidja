@@ -1,0 +1,37 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.2",
+  "id": "playwright-e2e",
+  "name": "Playwright end-to-end tests",
+  "description": "Write end-to-end browser tests with Playwright for .NET or Python: role and label locators, web-first assertions that wait, an isolated browser context per test, the app started by the test fixture, and traces on failure. Pairs with bdd-scenarios for the step definitions. Use when testing a web UI end to end.",
+  "tags": [
+    "testing",
+    "e2e",
+    "dotnet",
+    "python"
+  ],
+  "recommend": {
+    "files": [
+      {
+        "glob": "playwright.config.*"
+      },
+      {
+        "glob": "*.csproj",
+        "contains": "Microsoft.Playwright"
+      },
+      {
+        "glob": "pyproject.toml",
+        "contains": "playwright"
+      },
+      {
+        "glob": "requirements*.txt",
+        "contains": "playwright"
+      }
+    ],
+    "frameworks": [
+      "playwright"
+    ],
+    "reason": "Playwright tests"
+  },
+  "content": "# Playwright end-to-end tests\n\nTest what the user sees and does, through a real browser against the real app.\n\n## Setup\n\n- **.NET**: `Microsoft.Playwright` plus the base package for your test runner (e.g. `Microsoft.Playwright.Xunit`), then install browsers once with `pwsh bin/Debug/net10.0/playwright.ps1 install chromium` (or the `playwright` CLI from the build output).\n- **Python**: `uv add --dev pytest-playwright`, then `uv run playwright install chromium`. Use the `page` fixture; run with `uv run pytest --tracing retain-on-failure`.\n- Start the app from a session fixture on a free port (as a process, or Kestrel / uvicorn in the fixture) with a test database (see `testcontainers`), and wait for its health endpoint before the first test.\n\n## Locators and assertions\n\n- Locate the way a user would: `get_by_role(\"button\", name=\"Save\")`, `get_by_label(\"Email\")`, `get_by_text(...)`. Fall back to `get_by_test_id` for elements with no accessible name. Never use CSS chains or XPath tied to layout.\n- Use web-first assertions, which retry until a timeout: Python `expect(page.get_by_role(\"alert\")).to_have_text(\"Saved\")`, .NET `await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveTextAsync(\"Saved\")`.\n- **No sleeps** (`wait_for_timeout`, `Task.Delay`). Wait for a visible result, a URL (`expect(page).to_have_url(...)`) or a response (`expect_response`).\n\n## Structure\n\n- Each test gets a fresh browser context (the fixtures do this), so cookies and storage never leak between tests.\n- Seed data through the API or the database, not by clicking through setup screens. Log in once and reuse the saved `storage_state` when many tests need a signed-in user.\n- Page objects (one class per page or component) hold locators and actions; tests and BDD steps call them. With the `bdd-scenarios` skill, each Given/When/Then step is a short call into a page object.\n- Keep the suite small and focused on user journeys; cover edge cases with integration tests below the UI.\n\n## Failures\n\n- Keep traces, screenshots and video for failed tests only (`--tracing retain-on-failure`, or the .NET context options) and open a trace with `playwright show-trace`.\n- A flaky test is a bug: find the missing wait or the shared state, don't add retries to hide it.\n"
+}

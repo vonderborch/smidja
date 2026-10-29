@@ -1,0 +1,424 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "5.0",
+  "id": "feature-flow",
+  "name": "Feature flow",
+  "description": "Takes a piece of work (a ticket, or just a name) from intent to merged, reviewed code, keeping every document in the scratch directory: the intent form, documentation research, a first draft of the specs, then rounds of research spikes and prototypes (which you approve) that loop back to research until nothing is left to find out, the final specs in a review loop, typed and ordered tickets, and waves of tickets each built in its own worktree and reviewed by parallel reviewers until they pass. The run can also include, as optional steps you pick when it starts, a security review and hardening (on by default), a release plan and observability (off), opening the PR (on) and a retro (off).",
+  "tags": [
+    "feature",
+    "planning",
+    "prototypes",
+    "release",
+    "security",
+    "spikes",
+    "tickets",
+    "worktrees"
+  ],
+  "parameters": [
+    {
+      "id": "kinds",
+      "label": "Ticket kinds",
+      "description": "The kinds the final tickets can be; spikes and prototypes run before the specs are final, so they aren't listed here.",
+      "default": "feature, bug, chore"
+    },
+    {
+      "id": "reviewers",
+      "label": "Reviewers",
+      "description": "The reviewers each ticket goes through at once, comma-separated: each is a review-<name> common step (built in: standards, specs, style). Add your own review-<name> step to add a reviewer.",
+      "default": "standards, specs, style"
+    }
+  ],
+  "skills": [
+    "caveman"
+  ],
+  "steps": [
+    {
+      "id": "intent",
+      "name": "Write the intent",
+      "type": "user",
+      "instructions": "Say what this feature is for. Your answers become INTENT.md in the scratch directory ({{scratch.dir}}), which every later step reads.",
+      "inputs": [
+        {
+          "id": "goal",
+          "label": "Goal",
+          "type": "multiline",
+          "help": "What this feature is for, and who it's for."
+        },
+        {
+          "id": "done",
+          "label": "Definition of done",
+          "type": "multiline",
+          "help": "How we'll know the work is finished."
+        },
+        {
+          "id": "constraints",
+          "label": "Constraints",
+          "type": "multiline",
+          "help": "Anything it must or mustn't do: compatibility, performance, dependencies, deadlines.",
+          "required": false
+        },
+        {
+          "id": "criteria",
+          "label": "Acceptance criteria",
+          "type": "multiline",
+          "help": "The checks it has to pass, one per line."
+        },
+        {
+          "id": "files",
+          "label": "Relevant files and modules",
+          "type": "multiline",
+          "help": "Where you expect the work to be, or what it touches.",
+          "required": false
+        },
+        {
+          "id": "dump",
+          "label": "Brain dump",
+          "type": "multiline",
+          "help": "Any other thoughts, ideas, worries or links.",
+          "required": false
+        }
+      ],
+      "outputTemplate": "# Intent: {{ticket.title}}\n\n{{ticket.key}} {{ticket.url}}\n\n{{ticket.body}}\n\n## Goal\n\n{{inputs.goal}}\n\n## Definition of done\n\n{{inputs.done}}\n\n## Constraints\n\n{{inputs.constraints}}\n\n## Acceptance criteria\n\n{{inputs.criteria}}\n\n## Relevant files and modules\n\n{{inputs.files}}\n\n## Brain dump\n\n{{inputs.dump}}\n",
+      "artifact": "{{scratch.dir}}/INTENT.md",
+      "arrows": [
+        {
+          "to": "research"
+        }
+      ]
+    },
+    {
+      "id": "research",
+      "name": "Research the docs",
+      "use": "grill-docs",
+      "with": {
+        "work": "feature"
+      },
+      "arrows": [
+        {
+          "to": "specs"
+        }
+      ]
+    },
+    {
+      "id": "specs",
+      "name": "Specs I: first draft",
+      "use": "to-specs",
+      "skipSkills": [
+        "caveman"
+      ],
+      "with": {
+        "work": "feature",
+        "extra": "This is the first draft. Where the specs depend on something nobody knows yet (an open question, a risky assumption, a choice between approaches, something nobody has checked works), say so under Risks and open questions: a spike or prototype will settle it before the specs are final."
+      },
+      "arrows": [
+        {
+          "to": "identify"
+        }
+      ]
+    },
+    {
+      "id": "identify",
+      "name": "Identify spikes or prototypes",
+      "use": "to-spikes",
+      "with": {
+        "work": "feature"
+      },
+      "arrows": [
+        {
+          "to": "spikes",
+          "when": {
+            "kind": "output",
+            "step": "identify",
+            "matches": "(?m)^Spikes: \\S"
+          },
+          "label": "spikes"
+        },
+        {
+          "to": "prototypes",
+          "when": {
+            "kind": "output",
+            "step": "identify",
+            "matches": "(?m)^Prototypes: \\S"
+          },
+          "label": "prototypes"
+        },
+        {
+          "to": "specs-review",
+          "when": {
+            "kind": "output",
+            "step": "identify",
+            "matches": "(?m)^NONE\\s*$"
+          },
+          "label": "nothing to try"
+        },
+        {
+          "to": "findings",
+          "when": {
+            "kind": "not",
+            "conditions": [
+              {
+                "kind": "any",
+                "conditions": [
+                  {
+                    "kind": "output",
+                    "step": "identify",
+                    "matches": "(?m)^Spikes: \\S"
+                  },
+                  {
+                    "kind": "output",
+                    "step": "identify",
+                    "matches": "(?m)^Prototypes: \\S"
+                  },
+                  {
+                    "kind": "output",
+                    "step": "identify",
+                    "matches": "(?m)^NONE\\s*$"
+                  }
+                ]
+              }
+            ]
+          },
+          "label": "nothing listed"
+        }
+      ]
+    },
+    {
+      "id": "spikes",
+      "name": "Research the spikes",
+      "type": "workflow",
+      "workflow": "ticket-spike",
+      "forEach": {
+        "kind": "lines",
+        "step": "identify",
+        "pattern": "^Spikes: (.+)$",
+        "separator": ","
+      },
+      "childrenTogether": true,
+      "with": {
+        "ticket": "{{item}}"
+      },
+      "arrows": [
+        {
+          "to": "findings"
+        }
+      ]
+    },
+    {
+      "id": "prototypes",
+      "name": "Build the prototypes",
+      "type": "workflow",
+      "workflow": "ticket-prototype",
+      "forEach": {
+        "kind": "lines",
+        "step": "identify",
+        "pattern": "^Prototypes: (.+)$",
+        "separator": ","
+      },
+      "childrenTogether": true,
+      "workspace": "worktree",
+      "mergeBack": false,
+      "with": {
+        "ticket": "{{item}}"
+      },
+      "arrows": [
+        {
+          "to": "findings"
+        }
+      ]
+    },
+    {
+      "id": "findings",
+      "name": "Approve the findings",
+      "use": "review-findings",
+      "with": {
+        "work": "feature"
+      },
+      "arrows": [
+        {
+          "to": "research",
+          "max": 4,
+          "onLimit": "continue",
+          "label": "another round"
+        },
+        {
+          "to": "specs-review"
+        }
+      ]
+    },
+    {
+      "id": "specs-review",
+      "name": "Specs II: final",
+      "use": "specs-review",
+      "skipSkills": [
+        "caveman"
+      ],
+      "with": {
+        "work": "feature",
+        "extra": "On the first pass, make this the final version: fold in what every spike and prototype found (FINDINGS.md and the *_REPORT.md files), settle each open question from it, build only on prototypes a person accepted, and leave nothing under Risks and open questions that a ticket would have to guess at."
+      },
+      "arrows": [
+        {
+          "to": "tickets"
+        }
+      ]
+    },
+    {
+      "id": "tickets",
+      "name": "To tickets",
+      "use": "to-tickets",
+      "with": {
+        "work": "feature",
+        "kinds": "{{params.kinds}}"
+      },
+      "arrows": [
+        {
+          "to": "build"
+        }
+      ]
+    },
+    {
+      "id": "build",
+      "name": "Implement the tickets",
+      "type": "workflow",
+      "workflow": "ticket-wave",
+      "forEach": {
+        "kind": "lines",
+        "step": "tickets",
+        "pattern": "^Wave \\d+: (.+)$"
+      },
+      "with": {
+        "tickets": "{{item}}",
+        "reviewers": "{{params.reviewers}}"
+      },
+      "arrows": [
+        {
+          "to": "security",
+          "when": {
+            "kind": "not",
+            "conditions": [
+              {
+                "kind": "output",
+                "step": "research",
+                "matches": "(?m)^SECURITY IMPACT: NONE\\s*$"
+              }
+            ]
+          },
+          "label": "security review"
+        },
+        {
+          "to": "harden",
+          "when": {
+            "kind": "output",
+            "step": "research",
+            "matches": "(?m)^SECURITY IMPACT: NONE\\s*$"
+          },
+          "label": "no security impact"
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "name": "Security review",
+      "use": "review-security",
+      "artifact": "{{scratch.dir}}/SECURITY.md",
+      "optional": {
+        "default": true,
+        "help": "A read-only security review of everything the build merged. It is skipped anyway when the research found no security impact."
+      },
+      "with": {
+        "scope": "the changes the build merged for this work: find the merge commits with `git log --merges --grep 'afl/{{ticket.slug}}/'` and read each one's diff with `git show -m --first-parent <commit>`, plus any uncommitted changes (git status, git diff HEAD)",
+        "context": "The intent, the final specs and the research in {{scratch.dir}} (INTENT.md, SPECS.md, RESEARCH.md): read them."
+      },
+      "arrows": [
+        {
+          "to": "harden"
+        }
+      ]
+    },
+    {
+      "id": "harden",
+      "name": "Harden and file follow-ups",
+      "use": "harden",
+      "optional": {
+        "default": true,
+        "help": "Fixes what the security review and the tickets' reviewers left unresolved, and files follow-up tickets for out-of-scope work."
+      },
+      "with": {
+        "findings": "The security review (empty if it was skipped or left out):\n{{steps.security.output?}}\n\nThe findings each ticket's reviewers left unresolved are in the *_REPORT.md files in {{scratch.dir}}: read them. The changes are the changes the build merged for this work: find the merge commits with `git log --merges --grep 'afl/{{ticket.slug}}/'` and read each one's diff with `git show -m --first-parent <commit>`, plus any uncommitted changes (git status, git diff HEAD)."
+      },
+      "arrows": [
+        {
+          "to": "deploy"
+        }
+      ]
+    },
+    {
+      "id": "deploy",
+      "name": "Plan the release",
+      "use": "release-plan",
+      "optional": {
+        "default": false,
+        "help": "A read-only release runbook (rollout, verification, rollback) saved as DEPLOY.md in the scratch directory."
+      },
+      "with": {
+        "docs": "{{scratch.dir}}",
+        "context": "the final specs ({{scratch.dir}}/SPECS.md) and the changes the build merged for this work: find the merge commits with `git log --merges --grep 'afl/{{ticket.slug}}/'` and read each one's diff with `git show -m --first-parent <commit>`, plus any uncommitted changes (git status, git diff HEAD)"
+      },
+      "arrows": [
+        {
+          "to": "observe"
+        }
+      ]
+    },
+    {
+      "id": "observe",
+      "name": "Add observability",
+      "use": "observe",
+      "optional": {
+        "default": false,
+        "help": "Adds the logging, metrics or traces the change needs and writes OBSERVABILITY.md: what to watch and alert on."
+      },
+      "with": {
+        "docs": "{{scratch.dir}}",
+        "context": "the intent and final specs ({{scratch.dir}}/INTENT.md and SPECS.md), the release plan ({{scratch.dir}}/DEPLOY.md) if there is one, and the changes the build merged for this work: find the merge commits with `git log --merges --grep 'afl/{{ticket.slug}}/'` and read each one's diff with `git show -m --first-parent <commit>`, plus any uncommitted changes (git status, git diff HEAD)"
+      },
+      "arrows": [
+        {
+          "to": "pr"
+        }
+      ]
+    },
+    {
+      "id": "pr",
+      "type": "user",
+      "name": "Open a PR and ship it",
+      "use": "open-pr",
+      "optional": {
+        "default": true,
+        "help": "You open the pull request, get it reviewed and release it, then note anything the retro should know."
+      },
+      "with": {
+        "docs": "{{scratch.dir}}",
+        "release": "the release plan in {{scratch.dir}}/DEPLOY.md if there is one, otherwise the repository's usual release process"
+      },
+      "arrows": [
+        {
+          "to": "retro"
+        }
+      ]
+    },
+    {
+      "id": "retro",
+      "name": "Retro and update CLAUDE.md",
+      "use": "retro",
+      "optional": {
+        "default": false,
+        "help": "Works out what slowed the work down and records the lessons in CLAUDE.md."
+      },
+      "with": {
+        "docs": "{{scratch.dir}}",
+        "notes": "{{steps.pr.inputs.went-well}}"
+      }
+    }
+  ]
+}

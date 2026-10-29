@@ -1,0 +1,61 @@
+{
+  "$schema": "./common-step.schema.json",
+  "schemaVersion": "2.0",
+  "id": "specs-review",
+  "name": "Review the specs",
+  "description": "Loops over SPECS.md: re-reads it against the intent, the research and any spike and prototype findings, works out what is still missing or ambiguous, asks you, and rewrites it, until nothing is left to ask (it ends the document with <!-- specs: complete -->) or five passes. Waits for your approval only on the last pass.",
+  "tags": [
+    "planning",
+    "review",
+    "specs"
+  ],
+  "parameters": [
+    {
+      "id": "work",
+      "label": "What kind of work this is",
+      "description": "How the prompts name the work, e.g. \"feature\" or \"bug fix\".",
+      "default": "feature"
+    },
+    {
+      "id": "extra",
+      "label": "Anything else to settle",
+      "description": "Extra instructions, e.g. what to fold in on the first pass.",
+      "default": ""
+    },
+    {
+      "id": "marker",
+      "label": "The line that ends the loop",
+      "default": "<!-- specs: complete -->"
+    }
+  ],
+  "step": {
+    "id": "specs-review",
+    "name": "Review the specs",
+    "type": "ai",
+    "ask": true,
+    "advance": "approve-final",
+    "permissionMode": "default",
+    "allowedTools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git status:*)",
+      "Bash(ls:*)"
+    ],
+    "artifact": "{{scratch.dir}}/SPECS.md",
+    "arrows": [
+      {
+        "to": "specs-review",
+        "until": {
+          "kind": "output",
+          "contains": "{{params.marker}}"
+        },
+        "max": 5,
+        "onLimit": "continue"
+      }
+    ],
+    "prompt": "Review the specs for this {{params.work}} ({{ticket.title}}) as the engineer who has to build it. Pass {{loop.iteration}}.\n\nRead {{scratch.path}}/SPECS.md, and check it against {{scratch.path}}/INTENT.md and {{scratch.path}}/RESEARCH.md, and FINDINGS.md and the spike and prototype reports (*_REPORT.md) there if there are any. Do not change any files.\n\n{{params.extra}}\n\nWork out what would still make someone guess while building or testing it: missing behaviour, ambiguous wording, unhandled errors or edge cases, acceptance criteria that can't be checked, contradictions with the intent, the research or the code, and anything in scope that the specs don't cover. Settle what you can by reading. Ask the user about the rest: only questions that matter, each answerable on its own.\n\nThen reply with the whole revised SPECS.md, in markdown, and nothing else. Keep its sections. If, after the answers, nothing is left that you'd need to ask, end the document with this line on its own: {{params.marker}}\nOtherwise don't write that line; a further pass will pick up what's left."
+  }
+}

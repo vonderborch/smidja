@@ -1,0 +1,33 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.2",
+  "id": "msbuild-hygiene",
+  "name": "MSBuild hygiene",
+  "description": "Review and tidy .NET project and build files: SDK-style projects, no hard-coded paths, incremental custom targets, analyzers and build-only packages kept private, and conditions that work on every platform. Use when reviewing or changing .csproj, .props or .targets files.",
+  "tags": [
+    "dotnet",
+    "msbuild",
+    "review"
+  ],
+  "recommend": {
+    "files": [
+      {
+        "glob": "*.csproj"
+      },
+      {
+        "glob": "*.sln"
+      },
+      {
+        "glob": "*.slnx"
+      },
+      {
+        "glob": "Directory.Build.props"
+      }
+    ],
+    "languages": [
+      "csharp"
+    ],
+    "reason": ".NET build"
+  },
+  "content": "# MSBuild hygiene\n\nProject files are code: keep them short, declarative and the same on every machine.\n\n## Look for\n\n- **Hard-coded paths.** Absolute paths, `..\\..\\` chains or `C:\\`. Use `$(MSBuildThisFileDirectory)`, `$(MSBuildProjectDirectory)`, `$(RepoRoot)` (set once in `Directory.Build.props`) and forward slashes, which work everywhere.\n- **Old-style leftovers** in SDK-style projects: explicit `<Compile Include>` lists that the default globs already cover (duplicate-item errors), `<Reference HintPath>` to DLLs instead of `PackageReference`/`ProjectReference`, `ToolsVersion`, `packages.config`.\n- **Repeated settings.** The same `TargetFramework`, `Nullable`, `LangVersion`, `TreatWarningsAsErrors`, analyzers or package versions in every project. Move them up (see `shared-build-config`).\n- **Leaky packages.** Analyzers, source generators and build-only tools without `PrivateAssets=\"all\"`, so they flow to every consumer.\n- **Custom targets that always run.** A target that generates or copies files needs `Inputs` and `Outputs` so incremental builds skip it; files it creates must be added to `FileWrites` so `clean` removes them. Prefer `<Copy>` and other built-in tasks over `<Exec>` with shell commands, which break across platforms.\n- **Fragile conditions.** `Condition=\"'$(Configuration)' == 'Debug'\"` is fine; conditions on OS-specific paths or environment variables that aren't set in CI are not. Quote both sides of a comparison.\n- **Properties in the wrong file.** Properties that other properties depend on go in `.props` (read before the project); targets, and properties that depend on the SDK's values, go in `.targets` (read after).\n- **Warnings switched off wholesale.** `NoWarn` lists that hide real problems. Each suppression needs a reason in a comment, scoped as narrowly as possible.\n\n## How to report and change\n\n- In a review, rank findings by impact (broken or nondeterministic builds first, then slow builds, then tidiness) with the file, line and suggested fix.\n- When changing files, build before and after with 0 warnings and make sure the outputs didn't change (same assemblies, same package versions). Use a binary log to compare when unsure (see `msbuild-binlog`).\n"
+}

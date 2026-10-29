@@ -1,0 +1,30 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.2",
+  "id": "typing-and-lint",
+  "name": "Python typing and lint",
+  "description": "Keep Python typed and clean: type hints everywhere, ruff for lint and format, ty for type checking with no errors, configured in pyproject.toml. Use when writing or changing Python code.",
+  "tags": [
+    "python",
+    "style",
+    "typing"
+  ],
+  "recommend": {
+    "files": [
+      {
+        "glob": "pyproject.toml"
+      },
+      {
+        "glob": "*.py"
+      },
+      {
+        "glob": "requirements*.txt"
+      }
+    ],
+    "languages": [
+      "python"
+    ],
+    "reason": "Python project"
+  },
+  "content": "# Python typing and lint\n\n## Typing\n\n- Type hints on every function signature and on module-level and class attributes. Modern syntax: `list[str]`, `dict[str, int]`, `X | None`, `type Alias = ...`.\n- Data shapes as `@dataclass(frozen=True, slots=True)` or Pydantic models, not loose dicts. `TypedDict` only for genuinely dict-shaped data like JSON you don't own.\n- `Protocol` for structural interfaces; `abc.ABC` with `@abstractmethod` for shared base behaviour; generics with `class Repo[T]:`.\n- Avoid `Any`. When you can't, isolate it at the boundary and narrow immediately. `cast` needs a comment saying why it's safe.\n- No suppression without a rule and a reason: `# ty: ignore[invalid-argument-type]  # lib stubs wrong`.\n\n## Checks (all must pass)\n\n- `uv run ruff check --fix` then `uv run ruff format`.\n- `uv run ty check` (Astral's type checker; add it with `uv add --dev ty`). If the repo already uses mypy or pyright, keep that instead of switching.\n- Suggested `pyproject.toml` baseline when the repo has none:\n\n```toml\n[tool.ruff]\nline-length = 100\n[tool.ruff.lint]\nselect = [\"E\", \"F\", \"W\", \"I\", \"UP\", \"B\", \"SIM\", \"RUF\", \"ASYNC\", \"S\"]\n[tool.ty.rules]\n# Everything ty reports is an error unless a rule is turned down here, with a reason.\n```\n\n## Style\n\n- `pathlib.Path` over string paths; f-strings; `logging` (with `logger = logging.getLogger(__name__)`) rather than `print` in library code.\n- Raise specific exceptions with clear messages; never bare `except:`; `except Exception` only at boundaries, and log it.\n- Docstrings on public modules, classes and functions saying what and why.\n"
+}

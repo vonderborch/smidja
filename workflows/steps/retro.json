@@ -1,0 +1,31 @@
+{
+  "$schema": "./common-step.schema.json",
+  "schemaVersion": "2.0",
+  "id": "retro",
+  "name": "Retro and update CLAUDE.md",
+  "description": "A short retrospective that works out what slowed the work down and records the lessons in CLAUDE.md, changing no other files.",
+  "tags": [
+    "retro",
+    "docs"
+  ],
+  "parameters": [
+    {
+      "id": "docs",
+      "label": "Where the work's documents are",
+      "description": "The directory the earlier steps saved their documents in, e.g. {{scratch.dir}} for feature-flow.",
+      "default": "docs/afl/{{ticket.slug}}"
+    },
+    {
+      "id": "notes",
+      "label": "Notes from whoever shipped it",
+      "description": "e.g. {{steps.pr.inputs.went-well}}.",
+      "default": ""
+    }
+  ],
+  "step": {
+    "id": "retro",
+    "name": "Retro and update CLAUDE.md",
+    "type": "ai",
+    "prompt": "Run a short retrospective on {{ticket.key}}: {{ticket.title}}. Read the documents in {{params.docs}}/ and the review history.\n\nNotes from the person who shipped it (may be empty):\n{{params.notes}}\n\nWork out what slowed the work down or caused review findings, and what the AI should know next time about this repository (commands, conventions, pitfalls, architecture). Update CLAUDE.md with the lessons that will help future work, keeping it concise and merging with what's already there rather than repeating it; create it if it doesn't exist. Change no other files. Report what you added to CLAUDE.md and why."
+  }
+}

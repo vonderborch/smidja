@@ -1,0 +1,32 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.2",
+  "id": "fastapi-service",
+  "name": "FastAPI service",
+  "description": "How to build FastAPI services: routers, Pydantic models for requests and responses, dependency injection, settings from the environment, async I/O, and integration tests with httpx against the real app. Use when building or changing a FastAPI API.",
+  "tags": [
+    "python",
+    "fastapi",
+    "api"
+  ],
+  "recommend": {
+    "files": [
+      {
+        "glob": "pyproject.toml",
+        "contains": "fastapi"
+      },
+      {
+        "glob": "requirements*.txt",
+        "contains": "fastapi"
+      }
+    ],
+    "languages": [
+      "python"
+    ],
+    "frameworks": [
+      "fastapi"
+    ],
+    "reason": "FastAPI service"
+  },
+  "content": "# FastAPI services\n\n## Layout\n\n```\nsrc/app/\n  main.py          # create_app(): builds FastAPI, includes routers, lifespan\n  settings.py      # pydantic-settings Settings, read from env / .env\n  api/<area>.py    # APIRouter per area\n  models/          # Pydantic request/response schemas\n  services/        # business logic, no FastAPI imports\n  db/              # engine setup, SQL queries and migrations (see python-raw-sql)\ntests/\n```\n\n## Conventions\n\n- An app factory `create_app()` plus a `lifespan` context manager for startup and shutdown (DB pools, clients). No module-level side effects.\n- One `APIRouter` per area with `prefix` and `tags`; declare `response_model` and status codes on every route.\n- Separate request and response models (`OrderCreate`, `OrderRead`); never return database rows or accept raw dicts.\n- Dependencies via `Depends` with `Annotated` aliases: `ConnDep = Annotated[AsyncConnection, Depends(get_conn)]`, a connection from SQLAlchemy's async engine inside a transaction. Auth is a dependency too.\n- Settings with `pydantic-settings`; secrets only from the environment, never committed or logged.\n- `async def` routes doing async I/O (httpx, asyncpg through SQLAlchemy's async engine). Blocking libraries go in plain `def` routes or `run_in_threadpool`.\n- Errors: raise `HTTPException` (or domain exceptions mapped by an exception handler) with a consistent error body; validate at the edge with Pydantic.\n- Keep business logic in `services/`, testable without HTTP.\n- Run locally with `uv run fastapi dev src/app/main.py`; in production `uv run fastapi run`.\n\n## Tests\n\n- **Integration first**: drive the real app over HTTP with `httpx.AsyncClient(transport=ASGITransport(app=app), base_url=\"http://test\")` (or `TestClient` for sync tests), using `asgi-lifespan` or the lifespan context so startup runs.\n- Database access is raw SQL through the engine, no ORM; see the `python-raw-sql` skill.\n- Use a real database (a Postgres test container, see `testcontainers`, or a temp SQLite file) with the migrations applied once per test session and a rolled-back transaction or truncate per test.\n- Swap only external services, via `app.dependency_overrides`.\n- Behaviour-level checks can be pytest-bdd scenarios; see the `bdd-scenarios` skill.\n"
+}

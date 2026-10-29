@@ -1,0 +1,33 @@
+{
+  "$schema": "./common-step.schema.json",
+  "schemaVersion": "2.0",
+  "id": "observe",
+  "name": "Add observability",
+  "description": "Adds the logging, metrics or traces a change needs, following the repo's conventions, and writes OBSERVABILITY.md: signals to watch, dashboards, alerts and what healthy looks like.",
+  "tags": [
+    "implementation",
+    "release",
+    "observability"
+  ],
+  "parameters": [
+    {
+      "id": "docs",
+      "label": "Where the work's documents are",
+      "description": "The directory the earlier steps saved their documents in, e.g. {{scratch.dir}} for feature-flow.",
+      "default": "docs/afl/{{ticket.slug}}"
+    },
+    {
+      "id": "context",
+      "label": "What to read first",
+      "description": "The documents that say what the change does, e.g. the requirements and the release plan.",
+      "default": "the documents the earlier steps saved"
+    }
+  ],
+  "step": {
+    "id": "observe",
+    "name": "Add observability",
+    "type": "ai",
+    "artifact": "{{params.docs}}/OBSERVABILITY.md",
+    "prompt": "Make sure we'll know whether {{ticket.key}}: {{ticket.title}} is working in production. Read {{params.context}}.\n\nAdd the logging, metrics or traces the change needs, following the repository's existing observability conventions, and keep the build and tests green. Then describe: the signals to watch, the dashboards or queries to add, the alerts (with thresholds) that should page someone, and what healthy looks like after release.\n\nYour whole reply is saved as {{params.docs}}/OBSERVABILITY.md; write it as that document, listing the code you added."
+  }
+}

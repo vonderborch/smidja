@@ -1,0 +1,128 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "5.0",
+  "id": "hotfix",
+  "name": "Hotfix",
+  "description": "The fast path for a production problem: find the root cause, make the smallest safe fix, review it, and ship it with a rollback plan. Follow-up work is filed as tickets.",
+  "tags": [
+    "bug",
+    "fix",
+    "production"
+  ],
+  "steps": [
+    {
+      "id": "research",
+      "name": "Find the root cause",
+      "type": "ai",
+      "ask": true,
+      "permissionMode": "default",
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git diff:*)",
+        "Bash(git status:*)",
+        "Bash(git log:*)",
+        "Bash(git show:*)"
+      ],
+      "artifact": "docs/afl/{{ticket.slug}}/INCIDENT.md",
+      "prompt": "Production problem {{ticket.key}}: {{ticket.title}}\n\n{{ticket.body}}\n\nFind the root cause quickly. Use the symptoms, recent changes (git log) and the code involved; ask if you need logs or details only a person can get. Do not change any files.\n\nYour whole reply is saved as docs/afl/{{ticket.slug}}/INCIDENT.md. Write it as that document: the symptoms, the root cause with file references, the blast radius, the smallest safe fix, and anything a proper fix should do later.",
+      "arrows": [
+        {
+          "to": "fix"
+        }
+      ]
+    },
+    {
+      "id": "fix",
+      "name": "Make the smallest safe fix",
+      "type": "ai",
+      "prompt": "Fix {{ticket.key}} with the smallest safe change. The root cause is in {{steps.research.artifact}}:\n\n{{steps.research.output}}\n\nIf the review sent the fix back, address what it raised:\n{{steps.review.previous}}\n\nFirst write a regression test that fails because of the bug, then make the fix. Don't refactor or tidy anything else. Run the full test suite and report what you changed and the results.",
+      "arrows": [
+        {
+          "to": "review"
+        }
+      ]
+    },
+    {
+      "id": "review",
+      "name": "Review the fix",
+      "type": "workflow",
+      "use": "code-review",
+      "with": {
+        "scope": "the uncommitted hotfix for {{ticket.key}} (look at git status and git diff HEAD)",
+        "context": "A hotfix for a production problem. The root cause is in {{steps.research.artifact}}. What the fix reported:\n\n{{steps.fix.output}}",
+        "extra": "This is a hotfix: within your lens, check that it fixes the root cause rather than the symptom, can't make things worse, has a regression test, and is as small as it can be. Leave anything a proper fix should do later to the follow-up step; it is not a reason for CHANGES."
+      },
+      "arrows": [
+        {
+          "to": "fix",
+          "when": {
+            "kind": "output",
+            "matches": "(?m)^VERDICT: CHANGES\\s*$"
+          },
+          "max": 3,
+          "label": "changes asked"
+        },
+        {
+          "to": "follow-up"
+        }
+      ],
+      "follow": "first"
+    },
+    {
+      "id": "follow-up",
+      "name": "File follow-up tickets",
+      "type": "ai",
+      "createTickets": true,
+      "permissionMode": "default",
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git diff:*)",
+        "Bash(git status:*)",
+        "Bash(git log:*)",
+        "Bash(git show:*)"
+      ],
+      "prompt": "File follow-up tickets for hotfix {{ticket.key}}: the proper fix, and any clean-up this hotfix deliberately leaves out, so they aren't forgotten. Do not change any files.\n\nThe root cause ({{steps.research.artifact}}):\n{{steps.research.output}}\n\nThe reviews:\n{{steps.review.output}}\n\nGive each ticket a clear title and a body that says why it matters and where. Report the tickets you filed.",
+      "arrows": [
+        {
+          "to": "deploy"
+        }
+      ]
+    },
+    {
+      "id": "deploy",
+      "name": "Plan the release and rollback",
+      "use": "release-plan",
+      "advance": "approve",
+      "prompt": "Write the release plan for hotfix {{ticket.key}}: how to ship it fast and safely (branch, build, the environments in order), how to confirm the problem is gone in production, the signal that means rolling back, and the rollback steps. Do not change any files.\n\nYour whole reply is saved as docs/afl/{{ticket.slug}}/DEPLOY.md; write it as that runbook.",
+      "arrows": [
+        {
+          "to": "ship"
+        }
+      ]
+    },
+    {
+      "id": "ship",
+      "name": "Ship it",
+      "type": "user",
+      "instructions": "Open a pull request for {{ticket.key}} that links {{ticket.url}}, get it approved, and release it following {{steps.deploy.artifact}}. Confirm the problem is gone in production.",
+      "inputs": [
+        {
+          "id": "url",
+          "label": "Pull request URL",
+          "type": "text",
+          "required": false,
+          "help": "Recorded on the run so it links to the PR."
+        },
+        {
+          "id": "resolved",
+          "label": "Is the problem gone in production?",
+          "type": "confirm"
+        }
+      ]
+    }
+  ]
+}

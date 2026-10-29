@@ -1,0 +1,69 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "5.0",
+  "id": "epic",
+  "name": "Epic",
+  "description": "Break a large ticket into sub-tickets, run the feature workflow on each one in turn as a child run, then review how the pieces fit together.",
+  "tags": [
+    "planning",
+    "tickets"
+  ],
+  "parameters": [
+    {
+      "id": "child-workflow",
+      "label": "Workflow for each sub-ticket",
+      "default": "feature"
+    }
+  ],
+  "steps": [
+    {
+      "id": "breakdown",
+      "name": "Break it into sub-tickets",
+      "type": "ai",
+      "advance": "approve",
+      "ask": true,
+      "createTickets": true,
+      "permissionMode": "default",
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git log:*)",
+        "Bash(git show:*)"
+      ],
+      "artifact": "docs/afl/{{ticket.slug}}/BREAKDOWN.md",
+      "prompt": "Epic {{ticket.key}}: {{ticket.title}}\n\n{{ticket.body}}\n\nRead the code this touches and split the work into sub-tickets that can each be built, reviewed and merged on their own, in the order they should be done. Keep each small enough for one pull request. Ask if the scope is unclear. Do not change any files.\n\nFile each sub-ticket, with a title, what to build, how to tell it's done, and which earlier sub-ticket it depends on.\n\nYour whole reply is saved as docs/afl/{{ticket.slug}}/BREAKDOWN.md: the sub-tickets in order, why the work is split that way, and the risks.",
+      "arrows": [
+        {
+          "to": "build"
+        }
+      ]
+    },
+    {
+      "id": "build",
+      "name": "Build each sub-ticket",
+      "type": "workflow",
+      "workflow": "{{params.child-workflow}}",
+      "forEach": {
+        "kind": "created-tickets",
+        "step": "breakdown"
+      },
+      "arrows": [
+        {
+          "to": "integrate"
+        }
+      ]
+    },
+    {
+      "id": "integrate",
+      "name": "Review the whole epic",
+      "type": "workflow",
+      "use": "code-review",
+      "with": {
+        "scope": "the work done for epic {{ticket.key}} across its sub-tickets (use git log, and git diff against the base branch)",
+        "context": "Epic {{ticket.key}} was split up as described in {{steps.breakdown.artifact}}. What each sub-ticket's run produced:\n\n{{steps.build.output}}",
+        "extra": "Within your lens, look for gaps between the sub-tickets, pieces that don't fit together, behaviour the epic asked for that no sub-ticket delivered, and follow-up work worth a ticket."
+      }
+    }
+  ]
+}

@@ -1,0 +1,433 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "5.0",
+  "id": "debug-flow",
+  "name": "Debug flow",
+  "description": "feature-flow for a bug: an intent form for the symptoms and how to reproduce them, documentation research that ranks root-cause hypotheses, a first draft of the fix's specs, rounds of spikes and reproductions or experiments (which you approve) that loop back to research until the cause is settled, the final specs in a review loop, then bug and chore tickets built in worktrees and reviewed by parallel reviewers until they pass. The run can also include, as optional steps you pick when it starts, a security review and hardening (on by default), a release plan and observability (off), opening the PR (on) and a retro (off).",
+  "tags": [
+    "bug",
+    "planning",
+    "prototypes",
+    "release",
+    "security",
+    "spikes",
+    "tickets",
+    "worktrees"
+  ],
+  "parameters": [
+    {
+      "id": "kinds",
+      "label": "Ticket kinds",
+      "description": "The kinds the final tickets can be; spikes and prototypes run before the specs are final, so they aren't listed here.",
+      "default": "bug, chore"
+    },
+    {
+      "id": "reviewers",
+      "label": "Reviewers",
+      "description": "The reviewers each ticket goes through at once, comma-separated: each is a review-<name> common step (built in: standards, specs, style). Add your own review-<name> step to add a reviewer.",
+      "default": "standards, specs, style"
+    }
+  ],
+  "skills": [
+    "caveman"
+  ],
+  "steps": [
+    {
+      "id": "intent",
+      "name": "Write the intent",
+      "type": "user",
+      "instructions": "Say what this bug fix is for. Your answers become INTENT.md in the scratch directory ({{scratch.dir}}), which every later step reads.",
+      "inputs": [
+        {
+          "id": "symptoms",
+          "label": "Symptoms",
+          "type": "multiline",
+          "help": "What goes wrong: errors, logs, screenshots, who sees it."
+        },
+        {
+          "id": "expected",
+          "label": "Expected vs actual",
+          "type": "multiline",
+          "help": "What should happen, and what happens instead."
+        },
+        {
+          "id": "repro",
+          "label": "How to reproduce",
+          "type": "multiline",
+          "help": "Steps, data or environment that trigger it; say if you can't reproduce it.",
+          "required": false
+        },
+        {
+          "id": "done",
+          "label": "Definition of done",
+          "type": "multiline",
+          "help": "How we'll know it's fixed."
+        },
+        {
+          "id": "constraints",
+          "label": "Constraints",
+          "type": "multiline",
+          "help": "Anything the fix must or mustn't do.",
+          "required": false
+        },
+        {
+          "id": "criteria",
+          "label": "Acceptance criteria",
+          "type": "multiline",
+          "help": "The checks the fix has to pass, one per line, including a regression test."
+        },
+        {
+          "id": "files",
+          "label": "Relevant files, modules and logs",
+          "type": "multiline",
+          "help": "Where you suspect the problem is.",
+          "required": false
+        },
+        {
+          "id": "dump",
+          "label": "Brain dump",
+          "type": "multiline",
+          "help": "Hunches, recent changes, anything else.",
+          "required": false
+        }
+      ],
+      "outputTemplate": "# Intent: {{ticket.title}}\n\n{{ticket.key}} {{ticket.url}}\n\n{{ticket.body}}\n\n## Symptoms\n\n{{inputs.symptoms}}\n\n## Expected vs actual\n\n{{inputs.expected}}\n\n## How to reproduce\n\n{{inputs.repro}}\n\n## Definition of done\n\n{{inputs.done}}\n\n## Constraints\n\n{{inputs.constraints}}\n\n## Acceptance criteria\n\n{{inputs.criteria}}\n\n## Relevant files, modules and logs\n\n{{inputs.files}}\n\n## Brain dump\n\n{{inputs.dump}}\n",
+      "artifact": "{{scratch.dir}}/INTENT.md",
+      "arrows": [
+        {
+          "to": "research"
+        }
+      ]
+    },
+    {
+      "id": "research",
+      "name": "Research the docs",
+      "use": "grill-docs",
+      "with": {
+        "work": "bug fix",
+        "extra": "This is a bug. Also form root-cause hypotheses: add a ## Root-cause hypotheses section after \"How it works today\", ranking each hypothesis by likelihood with the evidence for and against it and how to confirm or rule it out (a reproduction or experiment that a spike ticket could run)."
+      },
+      "arrows": [
+        {
+          "to": "specs"
+        }
+      ]
+    },
+    {
+      "id": "specs",
+      "name": "Specs I: first draft",
+      "use": "to-specs",
+      "with": {
+        "work": "bug fix",
+        "extra": "This is the first draft. Where the specs depend on something nobody knows yet (an open question, a risky assumption, a choice between approaches, something nobody has checked works), say so under Risks and open questions: a spike or prototype will settle it before the specs are final."
+      },
+      "arrows": [
+        {
+          "to": "identify"
+        }
+      ]
+    },
+    {
+      "id": "identify",
+      "name": "Identify spikes or prototypes",
+      "use": "to-spikes",
+      "with": {
+        "work": "bug fix",
+        "extra": "For a bug, a reproduction or an experiment that needs code (logging, a failing test, a bisect) is a prototype; checking a root-cause hypothesis against docs, code, issues or history is a spike. Pick the ones that confirm or rule out the hypotheses in RESEARCH.md."
+      },
+      "arrows": [
+        {
+          "to": "spikes",
+          "when": {
+            "kind": "output",
+            "step": "identify",
+            "matches": "(?m)^Spikes: \\S"
+          },
+          "label": "spikes"
+        },
+        {
+          "to": "prototypes",
+          "when": {
+            "kind": "output",
+            "step": "identify",
+            "matches": "(?m)^Prototypes: \\S"
+          },
+          "label": "prototypes"
+        },
+        {
+          "to": "specs-review",
+          "when": {
+            "kind": "output",
+            "step": "identify",
+            "matches": "(?m)^NONE\\s*$"
+          },
+          "label": "nothing to try"
+        },
+        {
+          "to": "findings",
+          "when": {
+            "kind": "not",
+            "conditions": [
+              {
+                "kind": "any",
+                "conditions": [
+                  {
+                    "kind": "output",
+                    "step": "identify",
+                    "matches": "(?m)^Spikes: \\S"
+                  },
+                  {
+                    "kind": "output",
+                    "step": "identify",
+                    "matches": "(?m)^Prototypes: \\S"
+                  },
+                  {
+                    "kind": "output",
+                    "step": "identify",
+                    "matches": "(?m)^NONE\\s*$"
+                  }
+                ]
+              }
+            ]
+          },
+          "label": "nothing listed"
+        }
+      ]
+    },
+    {
+      "id": "spikes",
+      "name": "Research the spikes",
+      "type": "workflow",
+      "workflow": "ticket-spike",
+      "forEach": {
+        "kind": "lines",
+        "step": "identify",
+        "pattern": "^Spikes: (.+)$",
+        "separator": ","
+      },
+      "childrenTogether": true,
+      "with": {
+        "ticket": "{{item}}"
+      },
+      "arrows": [
+        {
+          "to": "findings"
+        }
+      ]
+    },
+    {
+      "id": "prototypes",
+      "name": "Build the prototypes",
+      "type": "workflow",
+      "workflow": "ticket-prototype",
+      "forEach": {
+        "kind": "lines",
+        "step": "identify",
+        "pattern": "^Prototypes: (.+)$",
+        "separator": ","
+      },
+      "childrenTogether": true,
+      "workspace": "worktree",
+      "mergeBack": false,
+      "with": {
+        "ticket": "{{item}}"
+      },
+      "arrows": [
+        {
+          "to": "findings"
+        }
+      ]
+    },
+    {
+      "id": "findings",
+      "name": "Approve the findings",
+      "use": "review-findings",
+      "with": {
+        "work": "bug fix"
+      },
+      "arrows": [
+        {
+          "to": "research",
+          "max": 4,
+          "onLimit": "continue",
+          "label": "another round"
+        },
+        {
+          "to": "specs-review"
+        }
+      ]
+    },
+    {
+      "id": "specs-review",
+      "name": "Specs II: final",
+      "use": "specs-review",
+      "with": {
+        "work": "bug fix",
+        "extra": "On the first pass, make this the final version: fold in what every spike and prototype found (FINDINGS.md and the *_REPORT.md files), settle each open question from it, build only on prototypes a person accepted, and leave nothing under Risks and open questions that a ticket would have to guess at."
+      },
+      "arrows": [
+        {
+          "to": "tickets"
+        }
+      ]
+    },
+    {
+      "id": "tickets",
+      "name": "To tickets",
+      "use": "to-tickets",
+      "with": {
+        "work": "bug fix",
+        "kinds": "{{params.kinds}}"
+      },
+      "arrows": [
+        {
+          "to": "build"
+        }
+      ]
+    },
+    {
+      "id": "build",
+      "name": "Implement the tickets",
+      "type": "workflow",
+      "workflow": "ticket-wave",
+      "forEach": {
+        "kind": "lines",
+        "step": "tickets",
+        "pattern": "^Wave \\d+: (.+)$"
+      },
+      "with": {
+        "tickets": "{{item}}",
+        "reviewers": "{{params.reviewers}}"
+      },
+      "arrows": [
+        {
+          "to": "security",
+          "when": {
+            "kind": "not",
+            "conditions": [
+              {
+                "kind": "output",
+                "step": "research",
+                "matches": "(?m)^SECURITY IMPACT: NONE\\s*$"
+              }
+            ]
+          },
+          "label": "security review"
+        },
+        {
+          "to": "harden",
+          "when": {
+            "kind": "output",
+            "step": "research",
+            "matches": "(?m)^SECURITY IMPACT: NONE\\s*$"
+          },
+          "label": "no security impact"
+        }
+      ]
+    },
+    {
+      "id": "security",
+      "name": "Security review",
+      "use": "review-security",
+      "artifact": "{{scratch.dir}}/SECURITY.md",
+      "optional": {
+        "default": true,
+        "help": "A read-only security review of everything the build merged. It is skipped anyway when the research found no security impact."
+      },
+      "with": {
+        "scope": "the changes the build merged for this work: find the merge commits with `git log --merges --grep 'afl/{{ticket.slug}}/'` and read each one's diff with `git show -m --first-parent <commit>`, plus any uncommitted changes (git status, git diff HEAD)",
+        "context": "The intent, the final specs and the research in {{scratch.dir}} (INTENT.md, SPECS.md, RESEARCH.md): read them."
+      },
+      "arrows": [
+        {
+          "to": "harden"
+        }
+      ]
+    },
+    {
+      "id": "harden",
+      "name": "Harden and file follow-ups",
+      "use": "harden",
+      "optional": {
+        "default": true,
+        "help": "Fixes what the security review and the tickets' reviewers left unresolved, and files follow-up tickets for out-of-scope work."
+      },
+      "with": {
+        "findings": "The security review (empty if it was skipped or left out):\n{{steps.security.output?}}\n\nThe findings each ticket's reviewers left unresolved are in the *_REPORT.md files in {{scratch.dir}}: read them. The changes are the changes the build merged for this work: find the merge commits with `git log --merges --grep 'afl/{{ticket.slug}}/'` and read each one's diff with `git show -m --first-parent <commit>`, plus any uncommitted changes (git status, git diff HEAD)."
+      },
+      "arrows": [
+        {
+          "to": "deploy"
+        }
+      ]
+    },
+    {
+      "id": "deploy",
+      "name": "Plan the release",
+      "use": "release-plan",
+      "optional": {
+        "default": false,
+        "help": "A read-only release runbook (rollout, verification, rollback) saved as DEPLOY.md in the scratch directory."
+      },
+      "with": {
+        "docs": "{{scratch.dir}}",
+        "context": "the final specs ({{scratch.dir}}/SPECS.md) and the changes the build merged for this work: find the merge commits with `git log --merges --grep 'afl/{{ticket.slug}}/'` and read each one's diff with `git show -m --first-parent <commit>`, plus any uncommitted changes (git status, git diff HEAD)"
+      },
+      "arrows": [
+        {
+          "to": "observe"
+        }
+      ]
+    },
+    {
+      "id": "observe",
+      "name": "Add observability",
+      "use": "observe",
+      "optional": {
+        "default": false,
+        "help": "Adds the logging, metrics or traces the change needs and writes OBSERVABILITY.md: what to watch and alert on."
+      },
+      "with": {
+        "docs": "{{scratch.dir}}",
+        "context": "the intent and final specs ({{scratch.dir}}/INTENT.md and SPECS.md), the release plan ({{scratch.dir}}/DEPLOY.md) if there is one, and the changes the build merged for this work: find the merge commits with `git log --merges --grep 'afl/{{ticket.slug}}/'` and read each one's diff with `git show -m --first-parent <commit>`, plus any uncommitted changes (git status, git diff HEAD)"
+      },
+      "arrows": [
+        {
+          "to": "pr"
+        }
+      ]
+    },
+    {
+      "id": "pr",
+      "type": "user",
+      "name": "Open a PR and ship it",
+      "use": "open-pr",
+      "optional": {
+        "default": true,
+        "help": "You open the pull request, get it reviewed and release it, then note anything the retro should know."
+      },
+      "with": {
+        "docs": "{{scratch.dir}}",
+        "release": "the release plan in {{scratch.dir}}/DEPLOY.md if there is one, otherwise the repository's usual release process"
+      },
+      "arrows": [
+        {
+          "to": "retro"
+        }
+      ]
+    },
+    {
+      "id": "retro",
+      "name": "Retro and update CLAUDE.md",
+      "use": "retro",
+      "optional": {
+        "default": false,
+        "help": "Works out what slowed the fix down and records the lessons in CLAUDE.md."
+      },
+      "with": {
+        "docs": "{{scratch.dir}}",
+        "notes": "{{steps.pr.inputs.went-well}}"
+      }
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Afl.Cli/Afl.Cli.csproj" />
+    <Project Path="src/Afl.Core/Afl.Core.csproj" />
+    <Project Path="src/Afl.UI/Afl.UI.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Afl.Core.Tests/Afl.Core.Tests.csproj" />
+    <Project Path="tests/Afl.UI.Tests/Afl.UI.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dc="using:Afl.UI.DataContexts"
+             x:Class="Afl.UI.Views.ChecklistView">
+    <ScrollViewer MaxHeight="420">
+        <ItemsControl x:Name="Checklist">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="{x:Type dc:SelectableItem, x:TypeArguments=x:String}">
+                    <CheckBox IsChecked="{Binding IsSelected}">
+                        <TextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                    </CheckBox>
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </ScrollViewer>
+</UserControl>

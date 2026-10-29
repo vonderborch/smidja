@@ -1,0 +1,38 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.2",
+  "id": "testcontainers",
+  "name": "Testcontainers",
+  "description": "Run integration tests against real dependencies (Postgres, Redis, message brokers) in throwaway Docker containers with Testcontainers for .NET or testcontainers-python: one container per test session, clean state per test, no fixed ports. Use when writing tests that need a database or other service.",
+  "tags": [
+    "testing",
+    "integration",
+    "dotnet",
+    "python"
+  ],
+  "recommend": {
+    "files": [
+      {
+        "glob": "*.csproj",
+        "contains": "Testcontainers"
+      },
+      {
+        "glob": "Directory.Packages.props",
+        "contains": "Testcontainers"
+      },
+      {
+        "glob": "pyproject.toml",
+        "contains": "testcontainers"
+      },
+      {
+        "glob": "requirements*.txt",
+        "contains": "testcontainers"
+      }
+    ],
+    "frameworks": [
+      "testcontainers"
+    ],
+    "reason": "Uses Testcontainers"
+  },
+  "content": "# Testcontainers\n\nPrefer a real dependency in a container over a fake or an in-memory stand-in: the tests then catch SQL, driver and configuration bugs. Docker must be running.\n\n## .NET (Testcontainers for .NET)\n\n- Package per service: `Testcontainers.PostgreSql`, `Testcontainers.Redis`, and so on.\n- Share one container per test class or collection through an xUnit fixture that implements `IAsyncLifetime`:\n\n```csharp\npublic sealed class PostgresFixture : IAsyncLifetime\n{\n    private readonly PostgreSqlContainer _container = new PostgreSqlBuilder().WithImage(\"postgres:17-alpine\").Build();\n\n    public string ConnectionString => this._container.GetConnectionString();\n\n    public async ValueTask InitializeAsync()\n    {\n        await this._container.StartAsync();\n        // apply migrations here\n    }\n\n    public ValueTask DisposeAsync() => this._container.DisposeAsync();\n}\n```\n\n- ASP.NET Core: point `WebApplicationFactory<Program>` at the container by overriding the connection string in `ConfigureAppConfiguration` (or `UseSetting`), then drive the API with its `HttpClient`.\n\n## Python (testcontainers-python)\n\n- `uv add --dev testcontainers[postgres]` (extras per service).\n- A session-scoped pytest fixture owns the container; a function-scoped one gives each test a clean state:\n\n```python\n@pytest.fixture(scope=\"session\")\ndef postgres_url() -> Iterator[str]:\n    with PostgresContainer(\"postgres:17-alpine\", driver=\"asyncpg\") as pg:\n        url = pg.get_connection_url()\n        apply_migrations(url)\n        yield url\n```\n\n## Rules\n\n- **Pin the image tag** (`postgres:17-alpine`, matching production's major version), never `latest`.\n- **No fixed host ports.** Read the mapped port or connection string from the container.\n- **Start once, reset per test.** Starting a container takes seconds; share it per session or collection and reset state with a rolled-back transaction, `TRUNCATE ... RESTART IDENTITY CASCADE`, or a fresh database from a template.\n- Rely on the built-in wait strategies (the module waits until the service accepts connections); add a log or health wait for custom images instead of sleeping.\n- Leave the Ryuk reaper on so containers are removed even when a run crashes.\n- Apply the real migrations to the container rather than creating the schema a different way.\n- If Docker isn't available, fail with a clear message rather than silently skipping, unless the repo marks these tests as optional.\n"
+}

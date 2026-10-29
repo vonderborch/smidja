@@ -1,0 +1,31 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dc="using:Afl.UI.DataContexts"
+             x:Class="Afl.UI.Views.PickListView"
+             x:DataType="dc:PickListDataContext">
+    <!-- Ids picked from a set of choices: the picked ones, each with Remove, then a dropdown and Add -->
+    <StackPanel Spacing="4">
+        <Border BorderBrush="{DynamicResource SystemControlForegroundBaseLowBrush}" BorderThickness="1"
+                CornerRadius="4" IsVisible="{Binding HasPicked}">
+            <ScrollViewer MaxHeight="150" VerticalScrollBarVisibility="Auto">
+                <ItemsControl ItemsSource="{Binding Picked}" Margin="4">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="x:String">
+                            <DockPanel Margin="4,2">
+                                <Button DockPanel.Dock="Right" Content="Remove" Click="OnRemove" />
+                                <TextBlock Text="{Binding}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                            </DockPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </ScrollViewer>
+        </Border>
+        <TextBlock Classes="meta" Text="None added." IsVisible="{Binding !HasPicked}" />
+        <DockPanel>
+            <Button DockPanel.Dock="Right" Content="Add" Click="OnAdd" IsEnabled="{Binding CanAdd}"
+                    Margin="6,0,0,0" />
+            <ComboBox IsEditable="True" ItemsSource="{Binding Available}" Text="{Binding ToAdd}"
+                      PlaceholderText="Pick or type one…" HorizontalAlignment="Stretch" KeyDown="OnKeyDown" />
+        </DockPanel>
+    </StackPanel>
+</UserControl>

@@ -1,0 +1,14 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.1",
+  "id": "mutation-testing",
+  "name": "Mutation testing",
+  "description": "Check how good tests really are with mutation testing: Stryker.NET for .NET and mutmut for Python, scoped to changed code, with surviving mutants turned into missing assertions. Use when judging or improving a test suite, not on every build.",
+  "tags": [
+    "testing",
+    "quality",
+    "dotnet",
+    "python"
+  ],
+  "content": "# Mutation testing\n\nA mutation tool makes small changes to the code (flips a `<`, drops a call, returns a default) and runs the tests. A mutant that **survives** means no test noticed the change: usually a missing or weak assertion.\n\n## .NET: Stryker.NET\n\n- Install as a local tool: `dotnet new tool-manifest` (if there isn't one), then `dotnet tool install dotnet-stryker`.\n- Run from the test project's folder: `dotnet stryker`, or `dotnet stryker --project Afl.Core.csproj` when a test project covers several.\n- Scope it to the change: `dotnet stryker --since:main`.\n- Configure in `stryker-config.json` (thresholds `high`/`low`/`break`, `mutate` globs to leave out generated code). Read the HTML report under `StrykerOutput/`.\n\n## Python: mutmut\n\n- `uv add --dev mutmut`, configure under `[tool.mutmut]` in `pyproject.toml` (which source paths to mutate, which tests to run).\n- `uv run mutmut run`, then `uv run mutmut results` to list survivors and `uv run mutmut show <id>` (or `mutmut browse`) to see a mutant's diff.\n\n## Working through survivors\n\n1. Read the mutant's diff and ask which behaviour it changes.\n2. Add or tighten a test that asserts that behaviour (prefer an integration-level test, per the repo's style). Don't write a test that pins the implementation just to kill the mutant.\n3. If the mutant is **equivalent** (no observable difference, e.g. a log message), ignore it with the tool's ignore comment and a reason.\n4. Re-run on the same scope until the survivors left are equivalent or deliberately untested.\n\n## Rules\n\n- It's slow: run it on changed code, locally or as a scheduled job, not on every build.\n- Aim for a high score on business logic; don't chase 100% across the codebase.\n- Report the score and what was added, not just \"tests pass\".\n"
+}

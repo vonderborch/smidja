@@ -1,0 +1,33 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.2",
+  "id": "shared-build-config",
+  "name": "Shared build configuration",
+  "description": "Share build settings across a .NET solution with Directory.Build.props/targets and pin every package version once with Central Package Management (Directory.Packages.props), including converting an existing solution safely. Use when two or more projects repeat settings or package versions drift.",
+  "tags": [
+    "dotnet",
+    "msbuild",
+    "nuget"
+  ],
+  "recommend": {
+    "files": [
+      {
+        "glob": "*.csproj"
+      },
+      {
+        "glob": "*.sln"
+      },
+      {
+        "glob": "*.slnx"
+      },
+      {
+        "glob": "Directory.Build.props"
+      }
+    ],
+    "languages": [
+      "csharp"
+    ],
+    "reason": ".NET build"
+  },
+  "content": "# Shared build configuration\n\n## Directory.Build files\n\n- `Directory.Build.props` at the repo (or `src/`) root holds what every project shares: `TargetFramework`, `Nullable`, `ImplicitUsings`, `LangVersion`, `TreatWarningsAsErrors`, `GenerateDocumentationFile`, analyzers, and `RepoRoot`.\n- `Directory.Build.targets` holds shared targets and anything that must run after the SDK has set its properties.\n- MSBuild uses only the **nearest** `Directory.Build.props` above a project. A nested one (e.g. `tests/Directory.Build.props` for test-only settings) must import its parent explicitly:\n\n```xml\n<Import Project=\"$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))\" />\n```\n\n- Keep exceptions in the project that needs them, overriding the shared value, rather than adding conditions to the shared file.\n\n## Central Package Management\n\n- `Directory.Packages.props` at the root with `<ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>` and one `<PackageVersion Include=\"...\" Version=\"...\" />` per package, sorted.\n- Projects keep `<PackageReference Include=\"...\" />` with **no** `Version`.\n- Packages every project needs (analyzers) can be a `<GlobalPackageReference>`.\n- A project that truly needs a different version uses `VersionOverride` with a comment saying why; treat each one as debt.\n\n## Converting a solution\n\n1. Build and test on a clean checkout, and record the resolved package versions (`dotnet list package --include-transitive` per project, or a binary log).\n2. Collect every `PackageReference` version, including ones set through MSBuild properties. Where projects disagree, pick the highest version unless something pins the lower one, and note each decision.\n3. Write `Directory.Packages.props`, strip `Version` from the projects, and inline any version properties that are no longer needed.\n4. Restore, build with 0 warnings and run the tests. Compare the resolved versions with step 1: any change should be one you chose in step 2.\n5. Report what was centralised, the conflicts and how they were settled, and any `VersionOverride` left.\n\nDon't convert a repo that still uses `packages.config`; move it to `PackageReference` first.\n"
+}

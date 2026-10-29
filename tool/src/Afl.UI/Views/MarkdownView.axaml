@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="clr-namespace:Markdown.Avalonia.Full;assembly=Markdown.Avalonia.Full"
+             x:Class="Afl.UI.Views.MarkdownView">
+    <DockPanel>
+        <!-- Formatted/Raw (or Edit/Preview when editable), Copy and Expand -->
+        <StackPanel x:Name="Bar" DockPanel.Dock="Top" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="2">
+            <ToggleButton x:Name="ModeToggle" Classes="markdown" IsCheckedChanged="OnModeChanged" />
+            <Button x:Name="CopyButton" Classes="markdown" Content="Copy" Click="OnCopy" IsVisible="False"
+                    ToolTip.Tip="Copy the markdown as written" />
+            <Button x:Name="ExpandButton" Classes="markdown" Content="Expand" Click="OnExpand"
+                    ToolTip.Tip="Read it formatted in a larger window" />
+        </StackPanel>
+        <Panel>
+            <md:MarkdownScrollViewer x:Name="Formatted" SelectionEnabled="True" />
+            <ScrollViewer x:Name="RawScroller" IsVisible="False">
+                <SelectableTextBlock x:Name="Raw" TextWrapping="Wrap" FontFamily="{StaticResource MonoFont}" FontSize="12" />
+            </ScrollViewer>
+            <TextBox x:Name="Editor" IsVisible="False" AcceptsReturn="True" TextWrapping="Wrap"
+                     FontFamily="{StaticResource MonoFont}" FontSize="12" />
+        </Panel>
+    </DockPanel>
+</UserControl>

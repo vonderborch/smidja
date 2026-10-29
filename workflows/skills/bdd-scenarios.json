@@ -1,0 +1,29 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.2",
+  "id": "bdd-scenarios",
+  "name": "BDD scenarios",
+  "description": "Write behaviour as Gherkin scenarios (Given/When/Then) that business people can read and validate, with step bindings in Reqnroll for .NET or pytest-bdd for Python. Use when adding or changing user-visible behaviour.",
+  "tags": [
+    "testing",
+    "bdd",
+    "csharp",
+    "python"
+  ],
+  "recommend": {
+    "files": [
+      {
+        "glob": "*.feature"
+      }
+    ],
+    "frameworks": [
+      "reqnroll",
+      "pytest-bdd"
+    ],
+    "reason": "Gherkin scenarios"
+  },
+  "content": "# Behaviour as scenarios\n\nGherkin scenarios let someone outside engineering read a feature and say \"yes, that's what we meant\". Write them for that reader.\n\n## Writing scenarios\n\n- One `.feature` file per feature, a `Feature:` line and a short \"why\" paragraph under it.\n- Each `Scenario:` is one example of one rule. Name it for the outcome: `Scenario: A declined card leaves the order unpaid`.\n- **Given** the state, **When** one action, **Then** the observable outcome. `And`/`But` continue the previous kind.\n- Business language only: no URLs, selectors, SQL, class names or HTTP codes in the steps.\n- Declarative, not click-by-click: `When the customer pays with a declined card`, not five steps of typing.\n- Use `Scenario Outline:` with `Examples:` for the same rule over several values; a `Rule:` block to group scenarios under the rule they illustrate.\n- `Background:` only for setup every scenario in the file shares, and keep it short.\n- Tag scenarios (`@smoke`, `@slow`, `@wip`) the way the repo already does.\n\n## Step bindings\n\n- Bindings drive the system the way an integration test does: through the API, CLI or app, with real collaborators where practical.\n- Keep bindings thin; put shared setup and drivers in helper classes or fixtures.\n- Reuse steps by wording them consistently; parameterise with `{string}`/`{int}` (Cucumber expressions) rather than copy-pasting.\n- Share state between steps through the framework's context (Reqnroll `ScenarioContext` or constructor-injected context classes; pytest-bdd fixtures and `target_fixture`), never statics or globals.\n\n## .NET: Reqnroll\n\n- Reqnroll is the maintained successor to SpecFlow. Package: `Reqnroll.xUnit` (or `.NUnit`/`.MsTest`) in the test project; `.feature` files sit beside the bindings.\n- Bindings are `[Binding]` classes with `[Given]`, `[When]`, `[Then]` methods; hooks with `[BeforeScenario]`/`[AfterScenario]`.\n- Run with `dotnet test`; filter by tag with `--filter \"Category=smoke\"`.\n\n## Python: pytest-bdd\n\n- `uv add --dev pytest-bdd`. Features in `tests/features/`, steps in `tests/step_defs/`.\n- `scenarios(\"checkout.feature\")` collects every scenario in a file; steps use `@given`, `@when`, `@then` with `parsers.parse(...)`, and `target_fixture=` to hand a value to later steps.\n- Run with `uv run pytest`; filter by tag with `-m smoke`.\n\nSee `example.feature` for the shape to aim for.\n",
+  "files": {
+    "example.feature": "Feature: Paying for an order\n  Customers pay at checkout so the order can be shipped.\n  A failed payment must never mark the order as paid.\n\n  Background:\n    Given a customer with an order totalling £40\n\n  Rule: Only a successful payment marks the order as paid\n\n    Scenario: A successful card payment marks the order as paid\n      When the customer pays with a valid card\n      Then the order is paid\n      And the customer receives a receipt\n\n    Scenario: A declined card leaves the order unpaid\n      When the customer pays with a declined card\n      Then the order is not paid\n      And the customer is asked to try another card\n\n  Rule: Discounts apply before payment\n\n    Scenario Outline: Discount codes reduce the amount charged\n      Given the customer applies the code \"<code>\"\n      When the customer pays with a valid card\n      Then the card is charged <charged>\n\n      Examples:\n        | code     | charged |\n        | TENOFF   | £30     |\n        | HALFTIME | £20     |\n        | EXPIRED  | £40     |\n"
+  }
+}

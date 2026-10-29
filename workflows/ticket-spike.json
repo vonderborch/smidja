@@ -1,0 +1,48 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "5.0",
+  "id": "ticket-spike",
+  "name": "Research a spike",
+  "description": "Answers one spike ticket from the scratch directory by research alone (docs, code, issues, the web), without changing any files, and writes <ticket>_REPORT.md. Runs without asking you anything.",
+  "tags": [
+    "research",
+    "spikes"
+  ],
+  "parameters": [
+    {
+      "id": "ticket",
+      "label": "Ticket",
+      "description": "The spike's id: its file name in the scratch directory without .md, e.g. spike-002-cache-library."
+    },
+    {
+      "id": "brief",
+      "label": "The document it serves",
+      "description": "The file in the scratch directory the spike settles a question for, e.g. SPECS.md (the draft specs) or OPTIONS.md (architecture options).",
+      "default": "SPECS.md"
+    }
+  ],
+  "skills": [
+    "caveman"
+  ],
+  "steps": [
+    {
+      "id": "research",
+      "name": "Research the spike",
+      "type": "ai",
+      "permissionMode": "default",
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git log:*)",
+        "Bash(git show:*)",
+        "Bash(git status:*)",
+        "Bash(ls:*)",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "artifact": "{{scratch.dir}}/{{params.ticket}}_REPORT.md",
+      "prompt": "Research spike {{params.ticket}} of {{ticket.title}}.\n\nRead the spike, {{scratch.path}}/{{params.ticket}}.md, and the draft it serves, {{scratch.path}}/{{params.brief}}. Answer its question by reading: the repo's docs and code, the docs of any library or service involved, issues and the web. Do not change any files.\n\nReply with the report, in markdown, and nothing else:\n\n# Report: {{params.ticket}}\n## Question\n## Answer\n(short and direct; say how sure you are)\n## Evidence\n(each source, with what it showed)\n## What it means for {{params.brief}}\n## Still unknown"
+    }
+  ]
+}

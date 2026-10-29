@@ -1,0 +1,30 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.2",
+  "id": "csharp-refactoring",
+  "name": "C# refactoring",
+  "description": "Restructure C# code without changing what it does: green tests before and after, symbol-aware renames instead of text replacement, small steps, and behaviour changes kept out of refactoring commits. Use when a step renames, moves, extracts, splits or consolidates C# code.",
+  "tags": [
+    "csharp",
+    "dotnet",
+    "refactoring"
+  ],
+  "recommend": {
+    "files": [
+      {
+        "glob": "*.csproj"
+      },
+      {
+        "glob": "*.sln"
+      },
+      {
+        "glob": "*.slnx"
+      }
+    ],
+    "languages": [
+      "csharp"
+    ],
+    "reason": "C# project"
+  },
+  "content": "# Refactoring C#\n\nA refactor changes the shape of the code, never its behaviour. If the request mixes the two, do the refactor first, commit it, then make the behaviour change separately (or say it's out of scope).\n\n## Before you start\n\n- Build with 0 warnings and run the tests. If anything is already red, stop and report it; you can't prove a refactor safe on a red baseline.\n- If the code you're moving has no tests covering it, add a characterisation test first: an integration-level test that pins what it does today, odd behaviour included.\n\n## Doing it\n\n- **Rename by symbol, not by text.** Use the IDE or Roslyn's rename (or the C# language server's references), not find-and-replace. Then search the text anyway for the places the compiler can't see:\n  - strings that name the symbol: `nameof` is fine, but reflection, `[JsonPropertyName]`, configuration keys, XAML bindings, logging templates and SQL column aliases aren't;\n  - every `partial` part of a type, and the source generator's *input* (never hand-edit `*.g.cs`);\n  - `#if` branches and other target frameworks the current build skips;\n  - `InternalsVisibleTo` friends and other repos that consume a public API.\n- **Small steps, each one building.** Extract, then move, then rename, building after each. A step that breaks the build in ten places is too big.\n- **Prefer the house shape.** When consolidating duplicates, pull shared behaviour into a generic or abstract base class rather than a new interface or a helper that does almost nothing (see `csharp-style`). Keep the version that the rest of the code already treats as the source of truth, and point the others at it.\n- **Public surface.** Renaming or moving a public type, member, JSON field or route breaks callers and stored data. Don't do it unless asked; if asked, say what breaks.\n- Delete what the refactor made dead (old overloads, unused usings, stale XML docs) in the same change.\n\n## Finishing\n\n- Build with 0 warnings and run the full test suite. The tests should pass without being edited; a test you had to change is a sign behaviour moved too.\n- In the summary, list what moved where and anything the compiler couldn't check (strings, reflection, other repos).\n"
+}

@@ -1,0 +1,12 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.1",
+  "id": "review-checklist",
+  "name": "Review checklist",
+  "description": "A checklist for reviewing a change: correctness, edge cases, errors, security, tests, readability and scope, with findings ranked by severity. Use for review steps.",
+  "tags": [
+    "review",
+    "quality"
+  ],
+  "content": "# Reviewing a change\n\nRead the whole diff and the code around it before commenting. Run the tests if you can.\n\n## Check, in this order\n\n1. **Does it do what was asked?** Compare against the ticket or spec; note anything missing or extra.\n2. **Correctness**: off-by-one, null/empty input, wrong conditions, missed branches, concurrency and ordering, resource cleanup, time zones and culture.\n3. **Errors**: failures surfaced with context, nothing swallowed, retries bounded, partial work rolled back.\n4. **Security**: untrusted input validated, no injection (SQL, shell, path, template), authorization checked on every entry point, no secrets in code, config or logs.\n5. **Tests**: the behaviour is covered, preferably by integration or scenario tests; a fixed bug has a regression test; tests would fail without the change.\n6. **Design and readability**: fits the codebase's patterns and naming, no duplication of something that exists, no dead code or leftover debugging, comments explain why.\n7. **Operations**: migrations safe to deploy, config and docs updated, logging useful, performance sensible for real data sizes.\n\n## Reporting\n\n- Rank findings: **blocking** (wrong or unsafe), **should fix**, **nit**. Lead with blocking ones.\n- Each finding: file and line, what's wrong, a concrete failure case, and a suggested fix.\n- Say what you checked and found fine, briefly, so the author knows what was covered.\n- Don't pad the list with style preferences the repo doesn't follow.\n"
+}

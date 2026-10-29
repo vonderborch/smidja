@@ -1,0 +1,46 @@
+{
+  "$schema": "./common-step.schema.json",
+  "schemaVersion": "2.0",
+  "id": "open-pr",
+  "name": "Open a PR and ship it",
+  "description": "A person opens the pull request, gets it reviewed and releases it, then records the PR URL and notes for the retro (inputs \"url\" and \"went-well\").",
+  "tags": [
+    "release",
+    "user"
+  ],
+  "parameters": [
+    {
+      "id": "docs",
+      "label": "Where the work's documents are",
+      "description": "The directory the earlier steps saved their documents in, e.g. {{scratch.dir}} for feature-flow.",
+      "default": "docs/afl/{{ticket.slug}}"
+    },
+    {
+      "id": "release",
+      "label": "How to release it",
+      "description": "Where the release plan is, or how this repo releases.",
+      "default": "the repository's usual release process"
+    }
+  ],
+  "step": {
+    "id": "pr",
+    "name": "Open a PR and ship it",
+    "type": "user",
+    "instructions": "Open a pull request for {{ticket.key}} that links {{ticket.url}} and the documents in {{params.docs}}/, get it reviewed, and release it following {{params.release}}.",
+    "inputs": [
+      {
+        "id": "url",
+        "label": "Pull request URL",
+        "type": "text",
+        "required": false,
+        "help": "Recorded on the run so it links to the PR."
+      },
+      {
+        "id": "went-well",
+        "label": "Anything the retro should know (what went well or badly)?",
+        "type": "multiline",
+        "required": false
+      }
+    ]
+  }
+}

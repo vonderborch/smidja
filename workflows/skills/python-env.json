@@ -1,0 +1,30 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.2",
+  "id": "python-env",
+  "name": "Python environment (uv)",
+  "description": "Manage Python projects with uv: pyproject.toml, uv.lock, uv add/sync/run, and pinned Python versions, never the system interpreter. Use whenever a step installs packages or runs Python.",
+  "tags": [
+    "python",
+    "uv",
+    "tooling"
+  ],
+  "recommend": {
+    "files": [
+      {
+        "glob": "pyproject.toml"
+      },
+      {
+        "glob": "*.py"
+      },
+      {
+        "glob": "requirements*.txt"
+      }
+    ],
+    "languages": [
+      "python"
+    ],
+    "reason": "Python project"
+  },
+  "content": "# Python environments with uv\n\nUse **uv** for everything: interpreters, virtual environments, dependencies and running tools.\n\n## Everyday commands\n\n- New project: `uv init` (an app) or `uv init --package` / `--lib` (installable). Use a `src/` layout for packages.\n- Python version: `uv python pin 3.13` writes `.python-version`; `requires-python` in `pyproject.toml` must agree.\n- Add dependencies: `uv add fastapi`, dev-only: `uv add --dev pytest ruff ty`. Never edit versions by hand when `uv add` can do it.\n- Install exactly what's locked: `uv sync` (CI: `uv sync --locked`, which fails if the lock is stale).\n- Run anything in the project env: `uv run pytest`, `uv run python -m app`, `uv run ruff check`.\n- One-off tools without installing: `uvx ruff format .`.\n- Upgrade one package: `uv lock --upgrade-package httpx`, then run the tests.\n\n## Rules\n\n- `pyproject.toml` and `uv.lock` are committed together; `.venv/` is not.\n- Never `pip install` into the system or global Python, and don't call `pip` inside the uv env; use `uv add`/`uv sync`.\n- Don't activate the venv in scripts; use `uv run` so the right interpreter is always used.\n- If the repo already uses poetry or pip-tools, follow it rather than converting, unless asked.\n- Configure tools (ruff, ty, pytest) in `pyproject.toml` rather than separate files.\n"
+}

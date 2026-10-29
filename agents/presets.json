@@ -1,0 +1,166 @@
+{
+  "schemaVersion": "2.0",
+  "agents": [
+    {
+      "id": "codex",
+      "name": "OpenAI Codex CLI",
+      "kind": "cli",
+      "description": "codex exec, headless; the final message is written to a file.",
+      "capabilities": [
+        "edit-code",
+        "run-commands",
+        "test"
+      ],
+      "command": "codex",
+      "args": [
+        "exec",
+        "--full-auto",
+        "--skip-git-repo-check",
+        "-o",
+        "{{outputFile}}"
+      ],
+      "modelArgs": [
+        "-m",
+        "{{model}}"
+      ],
+      "interactiveArgs": [
+        "{{prompt}}"
+      ]
+    },
+    {
+      "id": "codex-mcp",
+      "name": "OpenAI Codex (MCP server)",
+      "kind": "mcp",
+      "description": "codex mcp-server's codex tool; send-backs continue the thread with codex-reply.",
+      "capabilities": [
+        "edit-code",
+        "run-commands",
+        "test"
+      ],
+      "server": "codex",
+      "tool": "codex",
+      "arguments": {
+        "prompt": "{{prompt}}",
+        "cwd": "{{cwd}}",
+        "model": "{{model}}",
+        "sandbox": "workspace-write",
+        "approval-policy": "never"
+      },
+      "resumeTool": "codex-reply",
+      "resumeArguments": {
+        "prompt": "{{prompt}}",
+        "threadId": "{{session}}"
+      },
+      "sessionPath": "threadId"
+    },
+    {
+      "id": "gemini",
+      "name": "Google Gemini CLI",
+      "kind": "cli",
+      "description": "gemini -p, headless, auto-approving edits.",
+      "capabilities": [
+        "edit-code",
+        "run-commands",
+        "long-context",
+        "web"
+      ],
+      "command": "gemini",
+      "args": [
+        "--approval-mode",
+        "auto_edit",
+        "-p",
+        "{{prompt}}"
+      ],
+      "modelArgs": [
+        "-m",
+        "{{model}}"
+      ],
+      "interactiveArgs": [
+        "-i",
+        "{{prompt}}"
+      ]
+    },
+    {
+      "id": "aider",
+      "name": "Aider",
+      "kind": "cli",
+      "description": "aider --message, applying its edits without asking.",
+      "capabilities": [
+        "edit-code"
+      ],
+      "command": "aider",
+      "args": [
+        "--message",
+        "{{prompt}}",
+        "--yes-always",
+        "--no-pretty",
+        "--no-stream"
+      ],
+      "modelArgs": [
+        "--model",
+        "{{model}}"
+      ],
+      "interactiveArgs": [
+        "--message",
+        "{{prompt}}"
+      ]
+    },
+    {
+      "id": "ollama",
+      "name": "Ollama (local model)",
+      "kind": "cli",
+      "description": "A local model through ollama run; it answers but can't edit files.",
+      "capabilities": [
+        "local",
+        "cheap",
+        "read-only"
+      ],
+      "command": "ollama",
+      "args": [
+        "run",
+        "{{model}}"
+      ],
+      "promptVia": "stdin",
+      "model": "llama3.2",
+      "interactiveArgs": [
+        "run",
+        "{{model}}"
+      ]
+    },
+    {
+      "id": "opencode",
+      "name": "opencode",
+      "kind": "cli",
+      "description": "opencode run, headless.",
+      "capabilities": [
+        "edit-code",
+        "run-commands"
+      ],
+      "command": "opencode",
+      "args": [
+        "run",
+        "{{prompt}}"
+      ],
+      "modelArgs": [
+        "-m",
+        "{{model}}"
+      ],
+      "interactiveArgs": [
+        "--prompt",
+        "{{prompt}}"
+      ]
+    }
+  ],
+  "servers": [
+    {
+      "id": "codex",
+      "name": "OpenAI Codex MCP server",
+      "description": "codex mcp-server: the codex and codex-reply tools.",
+      "transport": "stdio",
+      "command": "codex",
+      "args": [
+        "mcp-server"
+      ]
+    }
+  ]
+}

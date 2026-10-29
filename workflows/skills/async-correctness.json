@@ -1,0 +1,30 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.2",
+  "id": "async-correctness",
+  "name": "Async correctness (.NET)",
+  "description": "Rules for async C#: async all the way, ConfigureAwait(false) in library code, never block on tasks, pass cancellation tokens, and handle concurrency safely. Use when writing or reviewing async .NET code.",
+  "tags": [
+    "csharp",
+    "dotnet",
+    "async"
+  ],
+  "recommend": {
+    "files": [
+      {
+        "glob": "*.csproj"
+      },
+      {
+        "glob": "*.sln"
+      },
+      {
+        "glob": "*.slnx"
+      }
+    ],
+    "languages": [
+      "csharp"
+    ],
+    "reason": "C# project"
+  },
+  "content": "# Async correctness in .NET\n\n## Rules\n\n- **Async all the way.** If a method calls async work, it is `async` and returns `Task`/`Task<T>`/`ValueTask`. Name it `...Async`.\n- **Never block on async work**: no `.Result`, `.Wait()` or `.GetAwaiter().GetResult()`. It deadlocks on UI threads and starves the thread pool. The only exception is a top-level entry point where you can show everything beneath uses `ConfigureAwait(false)`; say so in a comment.\n- **Library code** (anything not UI or app entry point) uses `ConfigureAwait(false)` on every await. UI code doesn't, so it returns to the UI thread.\n- **No `async void`** except event handlers; inside those, catch and report exceptions.\n- **Cancellation**: accept a `CancellationToken cancellationToken = default` as the last parameter and pass it to every call that takes one. Check it in long loops. Treat `OperationCanceledException` as cancellation, not failure.\n- **Timeouts** via `CancellationTokenSource.CancelAfter` or `Task.WaitAsync(timeout, token)`, not `Task.Delay` races.\n\n## Concurrency\n\n- Run independent work together with `Task.WhenAll`; bound parallelism with `Parallel.ForEachAsync` or a `SemaphoreSlim`.\n- Don't fire and forget. If work must outlive the caller, track the task and observe its exceptions.\n- Protect shared state: `SemaphoreSlim` for async critical sections (never `lock` around an await), concurrent collections, or immutable snapshots.\n- `ValueTask` only when profiling says so; never await one twice.\n- CPU-bound work goes to `Task.Run` at the app boundary, not inside library methods.\n\n## Tests\n\n- Test methods are `async Task`; await the code under test.\n- Wait for background work on a condition with a timeout, never a fixed `Task.Delay`.\n"
+}

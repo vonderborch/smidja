@@ -1,0 +1,32 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.2",
+  "id": "python-raw-sql",
+  "name": "Python raw SQL",
+  "description": "Talk to the database in plain SQL from Python: SQLAlchemy only for the engine and connection pool, text() queries with bound parameters, rows mapped to Pydantic models or dataclasses, migrations as SQL files. No ORM. Use when writing database code or migrations in Python.",
+  "tags": [
+    "python",
+    "sql",
+    "database"
+  ],
+  "recommend": {
+    "files": [
+      {
+        "glob": "pyproject.toml",
+        "contains": "sqlalchemy"
+      },
+      {
+        "glob": "requirements*.txt",
+        "contains": "sqlalchemy"
+      }
+    ],
+    "languages": [
+      "python"
+    ],
+    "frameworks": [
+      "sqlalchemy"
+    ],
+    "reason": "Python with SQL"
+  },
+  "content": "# Raw SQL in Python\n\nWrite SQL by hand. Use SQLAlchemy **only** for the engine, the connection pool, transactions and parameter binding. No ORM models, no `Session`, no query builder.\n\n## Engine\n\n- One engine per process, made in the app's lifespan and disposed on shutdown:\n\n```python\nengine = create_async_engine(settings.database_url, pool_pre_ping=True)  # postgresql+asyncpg://...\n...\nawait engine.dispose()\n```\n\n- Sync code uses `create_engine` and `with engine.begin() as conn:` the same way.\n- The URL comes from settings (the environment); never hard-code or log it, since it carries the password.\n\n## Queries\n\n```python\nGET_ORDER = text(\"select id, customer_id, total, created_at from orders where id = :id\")\n\nasync def get_order(conn: AsyncConnection, order_id: int) -> OrderRead | None:\n    row = (await conn.execute(GET_ORDER, {\"id\": order_id})).mappings().one_or_none()\n    return OrderRead.model_validate(dict(row)) if row else None\n```\n\n- **Every value is a bound parameter** (`:name`). Never build SQL with f-strings, `%` or `.format` from values. Table or column names that must vary come from a fixed allow-list in code.\n- `IN` lists: `text(\"... where id in :ids\").bindparams(bindparam(\"ids\", expanding=True))`.\n- Name the columns you select; no `select *`. Alias them to the model's field names.\n- Map rows to Pydantic models (`model_validate(dict(row))`) or frozen dataclasses (`Order(**row)`) at the query function, so nothing above it sees a `Row`.\n- Keep queries in one module per area (`db/orders.py`) as module-level `text()` constants or `.sql` files loaded once at import. Functions take the connection as their first argument.\n- Bulk insert: pass a list of dicts to `conn.execute(stmt, rows)` (executemany). Use `returning` to get generated ids.\n\n## Transactions\n\n- `async with engine.begin() as conn:` commits on success and rolls back on an exception. In FastAPI, a dependency yields that connection, so one request is one transaction.\n- A service function that needs several statements to succeed together takes the connection and runs them on it; it doesn't open its own.\n- Use `conn.begin_nested()` (a savepoint) only when part of the work may fail without undoing the rest.\n\n## Migrations\n\n- Plain SQL, forward-only, numbered: `migrations/0007_add_order_status.sql`. Either a small runner that applies unapplied files in order and records them in a `schema_migrations` table, or Alembic with `op.execute(...)` holding the SQL (no autogenerate, since there are no ORM models).\n- Each migration is safe to deploy against the running app: add columns nullable or with a default, backfill, then tighten; never rename and drop in one step.\n- Tests run the same migrations against a real database (see `testcontainers`).\n\n## Tests\n\n- Test query functions against a real database with the migrations applied, not mocks; roll back a transaction per test.\n- Cover the edge cases SQL gets wrong: empty results, nulls, duplicates and the unique constraint, time zones.\n"
+}

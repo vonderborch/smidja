@@ -1,0 +1,744 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/vonderborch/smidja/workflows/workflow.schema.json",
+  "title": "afl workflow",
+  "description": "An afl workflow: ordered steps done by the AI, by you, or by both. See workflows/README.md.",
+  "type": "object",
+  "required": [
+    "schemaVersion",
+    "id",
+    "name",
+    "steps"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "This schema, for editors. afl ignores it."
+    },
+    "schemaVersion": {
+      "type": "string",
+      "pattern": "^5\\.[0-9]+$",
+      "description": "The file format's version (5.x). Older files aren't read."
+    },
+    "id": {
+      "$ref": "#/$defs/id",
+      "description": "The workflow's id; it overrides a built-in or global workflow with the same id."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "The name shown in lists."
+    },
+    "description": {
+      "type": "string",
+      "description": "What the workflow is for."
+    },
+    "tags": {
+      "type": "array",
+      "maxItems": 20,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "pattern": "^[a-z0-9]+(-[a-z0-9]+)*$",
+        "maxLength": 40
+      },
+      "description": "Tags to filter the library by in the UI and with --tag, e.g. review or planning: lowercase letters, digits and hyphens."
+    },
+    "parameters": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/parameter"
+      },
+      "description": "Values the workflow takes from whoever starts it (afl start --param id=value) or whatever includes it (with), written {{params.<id>}} (3.3)."
+    },
+    "requires": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/requirement"
+      },
+      "description": "Other workflows that must have run on the ticket first: a finished run is reused, an unfinished one waited on, otherwise one is started (3.3)."
+    },
+    "skills": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/template"
+      },
+      "description": "The skills picked to start with (ids from afl skill-list): given to the agent of every AI or interactive step, on top of the step's own. The person starting a run can change the pick (afl start --skills), and child runs inherit it. An entry may be a template, and an empty one is dropped (3.4)."
+    },
+    "start": {
+      "$ref": "#/$defs/id",
+      "description": "The step the workflow starts at; by default the first one listed."
+    },
+    "maxSteps": {
+      "type": "integer",
+      "minimum": 1,
+      "default": 100,
+      "description": "The most step runs a run of the workflow does in all, counting every loop and path, before it fails (5.0)."
+    },
+    "onFailure": {
+      "$ref": "#/$defs/id",
+      "description": "The step a failure goes to when none of the failed step's arrows fire on it. It runs like an arrow on always, so the run still ends failed; no arrow may lead into it (5.0)."
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/step"
+      }
+    }
+  },
+  "$defs": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "idOrParam": {
+      "type": "string",
+      "pattern": "^([a-z0-9-]|\\{\\{params\\.[a-z0-9-]+\\}\\})+$",
+      "description": "An id, which can take all or part of itself from the workflow's parameters, e.g. {{params.child}} or review-{{params.lens}}."
+    },
+    "capability": {
+      "$ref": "#/$defs/id",
+      "description": "A capability: a built-in one (see afl capability list) or one of your own.",
+      "examples": [
+        "edit-code",
+        "run-commands",
+        "read-only",
+        "review",
+        "plan",
+        "test",
+        "web",
+        "long-context",
+        "fast",
+        "cheap",
+        "local",
+        "interactive",
+        "resume",
+        "permissions",
+        "mcp-tools"
+      ]
+    },
+    "template": {
+      "type": "string",
+      "description": "Text that may use template variables such as {{ticket.key}} or {{steps.<id>.output}}."
+    },
+    "step": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "enum": [
+            "ai",
+            "interactive",
+            "user",
+            "workflow"
+          ],
+          "default": "ai",
+          "description": "ai: headless AI; interactive: an AI session you talk to; user: you do it; workflow: runs another workflow as child runs (3.3)."
+        },
+        "use": {
+          "$ref": "#/$defs/idOrParam",
+          "description": "A common step (workflows/steps, ~/.afl/steps, <repo>/.afl/steps) this step is based on; any field set here overrides it, and its type is kept (3.3)."
+        },
+        "include": {
+          "$ref": "#/$defs/idOrParam",
+          "description": "A workflow whose steps are spliced in here, ids prefixed with this step's id; only id, name and with may be set alongside it (3.3)."
+        },
+        "with": {
+          "$ref": "#/$defs/with",
+          "description": "Values for the parameters of the common step (use), included workflow (include) or child workflow (workflow) (3.3)."
+        },
+        "workflow": {
+          "$ref": "#/$defs/idOrParam",
+          "description": "For type workflow: the workflow the child runs follow (3.3)."
+        },
+        "forEach": {
+          "$ref": "#/$defs/childSource",
+          "description": "For type workflow: what to start a child run for; one child on the run's ticket when unset. {{item}} is the ticket key or line (3.3)."
+        },
+        "children": {
+          "enum": [
+            "wait",
+            "start"
+          ],
+          "default": "wait",
+          "description": "For type workflow: wait waits for every child to finish; start moves on once they've started."
+        },
+        "childrenTogether": {
+          "type": "boolean",
+          "description": "For type workflow: run the children at the same time rather than one after another; risky when they edit the same working tree unless workspace is worktree. A --sequential run drives them one at a time anyway (3.3)."
+        },
+        "reuse": {
+          "type": "boolean",
+          "description": "For type workflow: use an existing run of the workflow on the same ticket instead of starting one (3.3)."
+        },
+        "childOutput": {
+          "$ref": "#/$defs/id",
+          "description": "For type workflow: the child workflow's step whose output becomes this step's; by default its last step with output (3.3)."
+        },
+        "workspace": {
+          "enum": [
+            "shared",
+            "worktree"
+          ],
+          "default": "shared",
+          "description": "For type workflow, or a fork: where each child run (or branch) works. shared: the parent's checkout; worktree: its own git worktree and branch, prepared just before it starts and merged back (--no-ff) once it is done (3.4; forks 4.0)."
+        },
+        "mergeBack": {
+          "type": "boolean",
+          "default": true,
+          "description": "For type workflow, or a fork, with a workspace of its own: merge a done child's (or branch's) work back (the default), or keep it on its branch unmerged, e.g. for a prototype (3.4)."
+        },
+        "prompt": {
+          "$ref": "#/$defs/template",
+          "description": "What the AI is asked (ai and interactive steps)."
+        },
+        "instructions": {
+          "$ref": "#/$defs/template",
+          "description": "What you're asked to do (user steps)."
+        },
+        "permissionMode": {
+          "type": "string",
+          "examples": [
+            "acceptEdits",
+            "default",
+            "plan",
+            "bypassPermissions"
+          ],
+          "description": "The agent's permission mode."
+        },
+        "allowedTools": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "model": {
+          "type": "string"
+        },
+        "agent": {
+          "$ref": "#/$defs/id",
+          "description": "The agent to use instead of the run's; with capabilities, the agent to prefer when it's installed and qualifies."
+        },
+        "capabilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/capability"
+          },
+          "description": "What the step needs; afl picks an installed agent that has all of them (built-in ids or your own tags)."
+        },
+        "select": {
+          "enum": [
+            "ai",
+            "first"
+          ],
+          "description": "How to pick among the agents that qualify: the run's agent chooses (ai), or the first in your preference order. Defaults to the global setting."
+        },
+        "agents": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "description": "Several agents do the step; combine says how their results become one."
+        },
+        "combine": {
+          "enum": [
+            "choose",
+            "merge",
+            "all"
+          ],
+          "description": "How several agents' results become the step's output."
+        },
+        "mergeAgent": {
+          "$ref": "#/$defs/id"
+        },
+        "mergePrompt": {
+          "$ref": "#/$defs/template"
+        },
+        "advance": {
+          "enum": [
+            "auto",
+            "approve",
+            "approve-final"
+          ],
+          "description": "Move on by itself, wait for your approval, or (with repeat) move on by itself while the loop goes round and wait for your approval only on its last pass (approve-final, 3.4)."
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/input"
+          }
+        },
+        "ask": {
+          "type": "boolean",
+          "description": "Let the AI ask its own questions while it works (ai steps done by one agent)."
+        },
+        "delegate": {
+          "type": "boolean",
+          "description": "Let the AI hand sub-tasks to other installed agents while it works (ai steps done by one agent)."
+        },
+        "delegateCapabilities": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/capability"
+          },
+          "description": "Capabilities every agent the AI hands work to must have."
+        },
+        "mcpServers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "description": "MCP servers (ids from afl mcp-list) given to the step's agent as extra tools."
+        },
+        "optionalMcpServers": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/id"
+          },
+          "description": "MCP servers given to the step's agent when they're set up here and the agent can take them; otherwise skipped with a note (3.2)."
+        },
+        "skills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/template"
+          },
+          "description": "Common skills (ids from afl skill-list) given to the step's agent, on top of the workflow's; an entry may be a template, and an empty one is dropped (3.4)."
+        },
+        "skipSkills": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/template"
+          },
+          "description": "The workflow's common skills this step doesn't get, e.g. [\"caveman\"] on a step that writes a document for people; an entry may be a template, and an empty one is dropped."
+        },
+        "directories": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/template"
+          },
+          "description": "Folders outside the repo the agent may also work in, e.g. other projects to learn from; an entry is a template that may hold several folders, one per line, ~ is the home folder, and a folder that doesn't exist is skipped with a note. The step's permission mode and allowed tools still apply there."
+        },
+        "createTickets": {
+          "type": "boolean",
+          "description": "Let the AI file tickets (GitHub issues or Jira issues, in the run's ticket source) with an afl-ticket block while it works (ai steps done by one agent; 3.2)."
+        },
+        "artifact": {
+          "$ref": "#/$defs/template",
+          "description": "A repo-relative file the step's output is saved to, e.g. docs/afl/{{ticket.slug}}/DESIGN.md; later steps read its path as {{steps.<id>.artifact}} (3.2)."
+        },
+        "outputTemplate": {
+          "$ref": "#/$defs/template",
+          "description": "The step's output, rendered from this template with the step's own answers ({{inputs.<id>}}) and its raw output ({{output}}); e.g. a form whose answers become a document (3.4)."
+        },
+        "optional": {
+          "type": "object",
+          "additionalProperties": false,
+          "description": "Makes the step optional: whoever starts the run chooses whether to include it (afl start --include/--exclude, or the start dialog); a step left out is skipped (3.7).",
+          "properties": {
+            "default": {
+              "type": "boolean",
+              "default": true,
+              "description": "Whether the step is included when nobody chooses otherwise."
+            },
+            "help": {
+              "type": "string",
+              "description": "What to tell someone choosing whether to include it."
+            }
+          }
+        },
+        "arrows": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/arrow"
+          },
+          "description": "Where the run goes once the step ends. Arrows that go back round a loop are checked first, in order; then the forward ones by follow. No arrow that fires ends the step's path (5.0)."
+        },
+        "follow": {
+          "enum": [
+            "all",
+            "first"
+          ],
+          "default": "all",
+          "description": "all: every forward arrow that applies, side by side; first: the first conditional arrow that holds, else every unconditional one (5.0)."
+        },
+        "waitFor": {
+          "$ref": "#/$defs/waitRule",
+          "description": "For a step forward arrows from several steps point at: what it waits for before it starts. Arrows that didn't fire are left out (5.0)."
+        },
+        "others": {
+          "enum": [
+            "cancel",
+            "finish"
+          ],
+          "default": "cancel",
+          "description": "Once waitFor holds: cancel the paths still heading only here, or let them finish (5.0)."
+        },
+        "retry": {
+          "$ref": "#/$defs/retry"
+        },
+        "timeout": {
+          "type": "string",
+          "pattern": "^([0-9]+(\\.[0-9]+)?[dhmsDHMS])+$",
+          "description": "How long the step may take, e.g. 30m; one that runs over is stopped and fails with a timeout (5.0)."
+        },
+        "position": {
+          "$ref": "#/$defs/position"
+        }
+      },
+      "description": "A step. id and name are required unless the step uses a common step, which gives them."
+    },
+    "input": {
+      "type": "object",
+      "required": [
+        "id",
+        "label"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id"
+        },
+        "label": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "enum": [
+            "text",
+            "multiline",
+            "number",
+            "choice",
+            "multichoice",
+            "confirm"
+          ],
+          "default": "text"
+        },
+        "help": {
+          "type": "string"
+        },
+        "options": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The choices (choice and multichoice inputs)."
+        },
+        "required": {
+          "type": "boolean",
+          "default": true
+        },
+        "default": {
+          "$ref": "#/$defs/template",
+          "description": "The suggested answer; may use template variables from earlier steps."
+        },
+        "when": {
+          "enum": [
+            "before",
+            "after",
+            "ai"
+          ],
+          "default": "after",
+          "description": "before the step starts, after it (when it's gated or you finish it), or only if the AI asks."
+        }
+      }
+    },
+    "arrow": {
+      "type": "object",
+      "required": [
+        "to"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "to": {
+          "type": "string",
+          "description": "A step id, or \"end\" to end this path."
+        },
+        "on": {
+          "enum": [
+            "success",
+            "failure",
+            "timeout",
+            "always"
+          ],
+          "default": "success",
+          "description": "Which ending fires it: success, failure, timeout (else failure arrows fire on a timeout) or always (it fires but doesn't handle a failure)."
+        },
+        "when": {
+          "$ref": "#/$defs/condition",
+          "description": "Taken only when this holds."
+        },
+        "until": {
+          "$ref": "#/$defs/condition",
+          "description": "Taken while this doesn't hold (for a loop); not with when."
+        },
+        "max": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "For an arrow that goes back: how many times its target may run; 5 when unset."
+        },
+        "onLimit": {
+          "enum": [
+            "fail",
+            "continue"
+          ],
+          "default": "fail",
+          "description": "For an arrow that goes back, at max: fail the step, or don't take the arrow and go on."
+        },
+        "label": {
+          "type": "string",
+          "description": "Shown on the arrow instead of its condition."
+        }
+      }
+    },
+    "position": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "x",
+        "y"
+      ],
+      "description": "Where the builder draws the step, once it has been moved by hand; runs ignore it (5.0).",
+      "properties": {
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      }
+    },
+    "retry": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Runs the step again when it fails, before its failure arrows fire (5.0).",
+      "properties": {
+        "max": {
+          "type": "integer",
+          "minimum": 1,
+          "default": 1,
+          "description": "How many times to run it again."
+        },
+        "delay": {
+          "type": "string",
+          "pattern": "^([0-9]+(\\.[0-9]+)?[dhmsDHMS])+$",
+          "description": "How long to wait first, e.g. 30s."
+        }
+      }
+    },
+    "waitRule": {
+      "description": "\"all\" or \"any\"; a step id (the arrow from it); or a group: { \"all\": [...] }, { \"any\": [...] } or { \"atLeast\": n, \"of\": [...] }, whose items are rules too.",
+      "oneOf": [
+        {
+          "enum": [
+            "all",
+            "any"
+          ]
+        },
+        {
+          "$ref": "#/$defs/id"
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "all"
+          ],
+          "properties": {
+            "all": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/waitRule"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "any"
+          ],
+          "properties": {
+            "any": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/waitRule"
+              }
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "atLeast",
+            "of"
+          ],
+          "properties": {
+            "atLeast": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "of": {
+              "type": "array",
+              "minItems": 1,
+              "items": {
+                "$ref": "#/$defs/waitRule"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "condition": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "always",
+            "input",
+            "output",
+            "ai",
+            "all",
+            "any",
+            "not"
+          ],
+          "default": "always"
+        },
+        "step": {
+          "$ref": "#/$defs/id"
+        },
+        "input": {
+          "$ref": "#/$defs/id"
+        },
+        "equals": {
+          "type": "string"
+        },
+        "contains": {
+          "type": "string"
+        },
+        "matches": {
+          "type": "string",
+          "description": "A regular expression."
+        },
+        "question": {
+          "$ref": "#/$defs/template"
+        },
+        "agent": {
+          "$ref": "#/$defs/id"
+        },
+        "conditions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/condition"
+          }
+        }
+      }
+    },
+    "with": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/template"
+      },
+      "description": "Values for the parameters of the common step, workflow or child workflow, by parameter id; values may be templates."
+    },
+    "parameter": {
+      "type": "object",
+      "required": [
+        "id"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "$ref": "#/$defs/id",
+          "description": "Used as {{params.<id>}} and as the key in with."
+        },
+        "label": {
+          "type": "string",
+          "description": "What people filling it in see; the id when unset."
+        },
+        "description": {
+          "type": "string",
+          "description": "What it's for."
+        },
+        "default": {
+          "type": "string",
+          "description": "Used when with doesn't give a value; a parameter without one must be given."
+        }
+      }
+    },
+    "requirement": {
+      "type": "object",
+      "required": [
+        "workflow"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "workflow": {
+          "$ref": "#/$defs/idOrParam",
+          "description": "The workflow that must have run on the ticket."
+        },
+        "with": {
+          "$ref": "#/$defs/with"
+        }
+      }
+    },
+    "childSource": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "enum": [
+            "ticket",
+            "tickets",
+            "created-tickets",
+            "lines",
+            "items"
+          ],
+          "default": "ticket",
+          "description": "ticket: one child on the run's ticket; tickets: one per ticket in tickets; created-tickets: one per ticket step filed; lines: one per line of step's output; items: one per value in items, on the run's ticket."
+        },
+        "step": {
+          "$ref": "#/$defs/id",
+          "description": "The earlier step the children come from (created-tickets, lines)."
+        },
+        "tickets": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/template"
+          },
+          "description": "Ticket references (tickets); each may be a template giving several, one per line or comma-separated."
+        },
+        "items": {
+          "$ref": "#/$defs/template",
+          "description": "For items: a comma- or newline-separated list, e.g. \"standards, specs, style\" or \"{{params.tickets}}\" (3.4)."
+        },
+        "pattern": {
+          "type": "string",
+          "description": "For lines: a regex; only matching lines count, and each gives its first capture group (or the whole match), e.g. ^Wave \\d+: (.+)$ (3.4)."
+        },
+        "separator": {
+          "type": "string",
+          "description": "For lines: splits each line (after pattern) into several items, e.g. \",\" (3.4)."
+        }
+      }
+    }
+  }
+}

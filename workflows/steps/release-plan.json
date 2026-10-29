@@ -1,0 +1,47 @@
+{
+  "$schema": "./common-step.schema.json",
+  "schemaVersion": "2.0",
+  "id": "release-plan",
+  "name": "Plan the release",
+  "description": "A read-only release runbook (rollout, verification, rollback) saved as DEPLOY.md in the work's documents directory.",
+  "tags": [
+    "planning",
+    "release"
+  ],
+  "parameters": [
+    {
+      "id": "docs",
+      "label": "Where the work's documents are",
+      "description": "The directory the earlier steps saved their documents in, e.g. {{scratch.dir}} for feature-flow.",
+      "default": "docs/afl/{{ticket.slug}}"
+    },
+    {
+      "id": "context",
+      "label": "What to read first",
+      "description": "The documents that say what the change does, e.g. the design.",
+      "default": "the uncommitted changes (git diff)"
+    },
+    {
+      "id": "cover",
+      "label": "What the plan must cover",
+      "default": "prerequisites (config, secrets, migrations, feature flags), the rollout order and any staged or canary rollout, how to verify it worked in each environment, the rollback plan and its trigger, and who needs to know"
+    }
+  ],
+  "step": {
+    "id": "deploy",
+    "name": "Plan the release",
+    "type": "ai",
+    "permissionMode": "default",
+    "allowedTools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Bash(git diff:*)",
+      "Bash(git status:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)"
+    ],
+    "artifact": "{{params.docs}}/DEPLOY.md",
+    "prompt": "Write the release plan for {{ticket.key}}: {{ticket.title}}. Read {{params.context}}.\n\nCover: {{params.cover}}. Do not change any files.\n\nYour whole reply is saved as {{params.docs}}/DEPLOY.md; write it as that runbook."
+  }
+}

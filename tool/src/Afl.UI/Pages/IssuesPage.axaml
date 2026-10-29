@@ -1,0 +1,108 @@
+<niddy:Page xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:niddy="https://github.com/vonderborch/Niddy"
+            xmlns:dc="using:Afl.UI.DataContexts"
+            xmlns:views="using:Afl.UI.Views"
+            xmlns:tickets="using:Afl.Core.Tickets"
+            x:Class="Afl.UI.Pages.IssuesPage"
+            x:DataType="dc:IssuesPageDataContext">
+
+    <Panel>
+        <TextBlock Text="{Binding NoRepoMessage}" Classes="hint" HorizontalAlignment="Center" VerticalAlignment="Center"
+                   IsVisible="{Binding !HasRepo}" />
+
+        <Grid ColumnDefinitions="520,*" RowDefinitions="Auto,Auto,Auto,*" IsVisible="{Binding HasRepo}">
+
+            <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Classes="error" Text="{Binding ErrorMessage}"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+            <!-- Listing options -->
+            <WrapPanel Grid.Row="1" Grid.ColumnSpan="2" ItemSpacing="8" LineSpacing="8" Margin="0,0,0,8">
+                <ComboBox ItemsSource="{Binding Sources}" SelectedItem="{Binding SelectedSource}" MinWidth="110"
+                          PlaceholderText="Source" />
+                <ComboBox ItemsSource="{Binding JiraFilters}" SelectedItem="{Binding SelectedJiraFilter}" MinWidth="160"
+                          IsVisible="{Binding IsJira}" ToolTip.Tip="Saved Jira filter (edit them in Settings)" />
+                <ComboBox ItemsSource="{Binding States}" SelectedItem="{Binding State}" MinWidth="100" />
+                <CheckBox Content="Assigned to me" IsChecked="{Binding OnlyMine}" IsVisible="{Binding IsGitHost}" />
+                <TextBox Text="{Binding LabelsText}" PlaceholderText="Labels, comma-separated" Width="180" KeyDown="OnSearchKeyDown"
+                         IsVisible="{Binding IsGitHost}" />
+                <TextBox Text="{Binding Search}" PlaceholderText="Search" Width="240" KeyDown="OnSearchKeyDown" />
+                <Button Classes="accent" Content="Refresh" Click="OnRefresh" />
+                <Button Content="New work…" Click="OnNewWork"
+                        ToolTip.Tip="Start a workflow on work that has no ticket, by giving it a name" />
+            </WrapPanel>
+
+            <!-- Link a ticket directly -->
+            <DockPanel Grid.Row="2" Grid.ColumnSpan="2" Margin="0,0,0,8">
+                <Button DockPanel.Dock="Right" Content="Link ticket" Click="OnLink" Margin="8,0,0,0" />
+                <TextBox Text="{Binding LinkText}" KeyDown="OnLinkKeyDown"
+                         PlaceholderText="Link a ticket: 123, group/project#123, PROJ-45 or an issue URL" />
+            </DockPanel>
+
+            <!-- Tickets -->
+            <DockPanel Grid.Row="3" Grid.Column="0" Margin="0,0,6,0">
+                <StackPanel DockPanel.Dock="Top" Orientation="Horizontal" Spacing="8">
+                    <TextBlock Classes="h2" Text="Tickets" />
+                    <ProgressBar IsIndeterminate="True" Width="80" IsVisible="{Binding IsBusy}" VerticalAlignment="Top"
+                                 Margin="0,6,0,0" />
+                </StackPanel>
+                <TextBlock DockPanel.Dock="Top" Classes="meta" Text="{Binding Status}" Margin="4,0,0,6" TextWrapping="Wrap" />
+                <Button DockPanel.Dock="Top" Content="Open repo settings" Click="OnOpenRepoSettings" Margin="4,0,0,6"
+                        IsVisible="{Binding HasNoSources}" />
+                <niddy:TableGrid x:Name="TicketTable" ItemsSource="{Binding Tickets}" SelectedItem="{Binding SelectedTicket}"
+                                 AutoGenerateColumns="False" EmptyText="No tickets to show." ItemActivated="OnTicketActivated"
+                                 ShowPageSizes="False" ToolTip.Tip="Double-click a ticket to start a workflow on it"
+                                 views:RowMenus.IsEnabled="True">
+                    <niddy:TableGrid.ContextMenu>
+                        <ContextMenu>
+                            <MenuItem Header="Start workflow…" Click="OnStart" />
+                            <MenuItem Header="Open in browser" Click="OnOpenTicket"
+                                      IsVisible="{Binding SelectedTicket.Url, Converter={x:Static StringConverters.IsNotNullOrEmpty}, FallbackValue=False}" />
+                            <Separator />
+                            <MenuItem Header="Copy key" Click="OnCopyTicketKey" />
+                            <MenuItem Header="Copy link" Click="OnCopyTicketLink"
+                                      IsVisible="{Binding SelectedTicket.Url, Converter={x:Static StringConverters.IsNotNullOrEmpty}, FallbackValue=False}" />
+                        </ContextMenu>
+                    </niddy:TableGrid.ContextMenu>
+                    <niddy:TableGrid.Columns>
+                        <DataGridTextColumn Header="Key" Binding="{Binding Key}" Width="Auto" x:DataType="tickets:Ticket" />
+                        <DataGridTextColumn Header="Title" Binding="{Binding Title}" Width="*" x:DataType="tickets:Ticket" />
+                        <DataGridTextColumn Header="Status" Binding="{Binding Status}" Width="Auto" x:DataType="tickets:Ticket" />
+                        <DataGridTextColumn Header="Assignee" Binding="{Binding Assignee, TargetNullValue='—'}" Width="Auto"
+                                            x:DataType="tickets:Ticket" />
+                    </niddy:TableGrid.Columns>
+                </niddy:TableGrid>
+            </DockPanel>
+
+            <!-- Selected ticket -->
+            <Border Grid.Row="3" Grid.Column="1" Margin="6,0,0,0" Classes="card">
+                <Panel>
+                    <TextBlock Text="Select a ticket" Classes="hint" HorizontalAlignment="Center" VerticalAlignment="Center"
+                               IsVisible="{Binding SelectedTicket, Converter={x:Static ObjectConverters.IsNull}}" />
+                    <DockPanel IsVisible="{Binding SelectedTicket, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <StackPanel DockPanel.Dock="Top" Spacing="4">
+                            <SelectableTextBlock Classes="h1" Text="{Binding SelectedTicket.Title}" />
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <TextBlock Classes="meta">
+                                    <TextBlock.Text>
+                                        <MultiBinding Converter="{x:Static dc:UiConverters.MetaLine}">
+                                            <Binding Path="SelectedTicket.Source" />
+                                            <Binding Path="SelectedTicket.Key" />
+                                            <Binding Path="SelectedTicket.Status" />
+                                        </MultiBinding>
+                                    </TextBlock.Text>
+                                </TextBlock>
+                                <HyperlinkButton Content="Open" NavigateUri="{Binding SelectedTicket.Url}" Padding="0"
+                                                 FontSize="12" />
+                            </StackPanel>
+                            <TextBlock Classes="meta" Text="{Binding SelectedTicket.Labels, Converter={x:Static dc:UiConverters.JoinWithCommas}}" />
+                            <Button Classes="accent" Content="Start workflow…" Click="OnStart" Margin="0,8" />
+                        </StackPanel>
+                        <views:MarkdownView Markdown="{Binding SelectedTicket.Body, Mode=OneWay}"
+                                            Title="{Binding SelectedTicket.Title}" MaxPreviewHeight="100000" />
+                    </DockPanel>
+                </Panel>
+            </Border>
+        </Grid>
+    </Panel>
+</niddy:Page>

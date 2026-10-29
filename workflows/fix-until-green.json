@@ -1,0 +1,71 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "5.0",
+  "id": "fix-until-green",
+  "name": "Fix until green",
+  "description": "Let the AI fix and re-run the tests until they pass, then check the result and send it back round if it's not right.",
+  "tags": [
+    "fix",
+    "loop",
+    "tests"
+  ],
+  "steps": [
+    {
+      "id": "fix",
+      "name": "Fix until the tests pass",
+      "type": "ai",
+      "ask": true,
+      "prompt": "Make the change {{ticket.key}} asks for: {{ticket.title}}\n\n{{ticket.body}}\n\n{{feedback}}\n\nThis is attempt {{loop.iteration}}. What the last attempt reported (empty on the first):\n{{steps.fix.previous}}\n\nWhy the last change was sent back, if it was:\n{{steps.check.previous}}\n\nRun the full test suite after your change. Report what you changed and the test results, and end with a line that is exactly `RESULT: PASS` if every test passes, otherwise `RESULT: FAIL`.",
+      "arrows": [
+        {
+          "to": "fix",
+          "until": {
+            "kind": "output",
+            "matches": "(?m)^RESULT: PASS\\s*$"
+          },
+          "max": 5,
+          "onLimit": "fail",
+          "label": "until the tests pass"
+        },
+        {
+          "to": "check"
+        }
+      ]
+    },
+    {
+      "id": "check",
+      "name": "Check the change",
+      "type": "user",
+      "instructions": "Check the change for {{ticket.key}}. What the AI reported:\n\n{{steps.fix.output}}",
+      "inputs": [
+        {
+          "id": "good",
+          "label": "Is the change right?",
+          "type": "confirm",
+          "help": "Answer no (and add a note saying why) to send the run back to the fix step, which sees your note."
+        }
+      ],
+      "arrows": [
+        {
+          "to": "fix",
+          "when": {
+            "kind": "input",
+            "input": "good",
+            "equals": "no"
+          },
+          "label": "sent back"
+        },
+        {
+          "to": "pr"
+        }
+      ],
+      "follow": "first"
+    },
+    {
+      "id": "pr",
+      "name": "Open a PR",
+      "type": "user",
+      "instructions": "Open a pull request for {{ticket.key}} that links {{ticket.url}}."
+    }
+  ]
+}

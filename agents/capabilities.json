@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "1.0",
+  "capabilities": [
+    { "id": "edit-code", "description": "Changes files in the repo." },
+    { "id": "run-commands", "description": "Runs shell commands such as builds and tests." },
+    { "id": "read-only", "description": "Only reads; never changes files. Safe for reviews and questions." },
+    { "id": "review", "description": "Good at reviewing changes and finding problems." },
+    { "id": "plan", "description": "Good at planning work and breaking it into steps." },
+    { "id": "test", "description": "Good at writing and fixing tests." },
+    { "id": "web", "description": "Can search or read the web." },
+    { "id": "long-context", "description": "Handles very large inputs (big diffs, many files)." },
+    { "id": "fast", "description": "Answers quickly." },
+    { "id": "cheap", "description": "Costs little to run." },
+    { "id": "local", "description": "Runs on this machine; nothing leaves it." },
+    { "id": "interactive", "description": "Can open a session you talk to (interactive steps). afl adds this itself." },
+    { "id": "resume", "description": "Can continue an earlier conversation. afl adds this itself." },
+    { "id": "permissions", "description": "Honours a step's permission mode and allowed tools. afl adds this itself." },
+    { "id": "mcp-tools", "description": "Can be given MCP servers as extra tools. afl adds this itself." }
+  ]
+}

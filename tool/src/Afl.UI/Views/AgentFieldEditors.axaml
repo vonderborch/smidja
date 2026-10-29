@@ -1,0 +1,71 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:dc="using:Afl.UI.DataContexts"
+                    xmlns:views="using:Afl.UI.Views">
+
+    <!-- One template per agent field editor (AgentFieldEditors); AgentFieldEditorSelector picks by the field's Editor. -->
+    <views:AgentFieldEditorSelector x:Key="AgentFieldEditor">
+        <DataTemplate x:Key="text" x:DataType="dc:AgentFieldDataContext">
+            <TextBox Text="{Binding Text}" IsReadOnly="{Binding IsReadOnly}" />
+        </DataTemplate>
+        <DataTemplate x:Key="choice" x:DataType="dc:AgentFieldDataContext">
+            <ComboBox ItemsSource="{Binding Choices}" SelectedItem="{Binding Text}" IsEnabled="{Binding IsEditable}"
+                      MinWidth="200" />
+        </DataTemplate>
+        <DataTemplate x:Key="server" x:DataType="dc:AgentFieldDataContext">
+            <AutoCompleteBox ItemsSource="{Binding Choices}" Text="{Binding Text}" IsEnabled="{Binding IsEditable}"
+                             MinimumPrefixLength="0" FilterMode="Contains" PlaceholderText="An MCP server id" />
+        </DataTemplate>
+        <DataTemplate x:Key="tool" x:DataType="dc:AgentFieldDataContext">
+            <AutoCompleteBox ItemsSource="{Binding Choices}" Text="{Binding Text}" IsEnabled="{Binding IsEditable}"
+                             MinimumPrefixLength="0" FilterMode="Contains"
+                             PlaceholderText="A tool name (List tools fills these in)" />
+        </DataTemplate>
+        <DataTemplate x:Key="list" x:DataType="dc:AgentFieldDataContext">
+            <TextBox Text="{Binding Text}" IsReadOnly="{Binding IsReadOnly}" AcceptsReturn="True" MinHeight="56"
+                     PlaceholderText="One per line" FontFamily="{StaticResource MonoFont}" FontSize="12" />
+        </DataTemplate>
+        <DataTemplate x:Key="map" x:DataType="dc:AgentFieldDataContext">
+            <TextBox Text="{Binding Text}" IsReadOnly="{Binding IsReadOnly}" AcceptsReturn="True" MinHeight="56"
+                     PlaceholderText="NAME=value, one per line" FontFamily="{StaticResource MonoFont}" FontSize="12" />
+        </DataTemplate>
+        <DataTemplate x:Key="json" x:DataType="dc:AgentFieldDataContext">
+            <TextBox Text="{Binding Text}" IsReadOnly="{Binding IsReadOnly}" AcceptsReturn="True" MinHeight="72"
+                     TextWrapping="Wrap" PlaceholderText="{}{ &quot;name&quot;: &quot;{{prompt}}&quot; }"
+                     FontFamily="{StaticResource MonoFont}" FontSize="12" />
+        </DataTemplate>
+        <DataTemplate x:Key="capabilities" x:DataType="dc:AgentFieldDataContext">
+            <ItemsControl ItemsSource="{Binding Items}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <WrapPanel ItemSpacing="10" />
+                    </ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="{x:Type dc:SelectableItem, x:TypeArguments=x:String}">
+                        <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding Value}"
+                                  ToolTip.Tip="{Binding Label}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </DataTemplate>
+        <DataTemplate x:Key="servers" x:DataType="dc:AgentFieldDataContext">
+            <StackPanel>
+                <ItemsControl ItemsSource="{Binding Items}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <WrapPanel ItemSpacing="10" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="{x:Type dc:SelectableItem, x:TypeArguments=x:String}">
+                            <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding Label}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <TextBlock Classes="meta" Text="No MCP servers yet; add them on the MCP servers tab."
+                           IsVisible="{Binding !Items.Count}" />
+            </StackPanel>
+        </DataTemplate>
+    </views:AgentFieldEditorSelector>
+</ResourceDictionary>

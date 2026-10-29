@@ -1,0 +1,252 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "5.0",
+  "id": "research",
+  "name": "Research spikes and prototypes",
+  "description": "Answers a question, or settles a set of unknowns, without changing your code: you say what you need to know and why, the AI reads the docs and code (RESEARCH.md), then rounds of research spikes and throwaway prototypes (which you approve, and accept or reject) loop back to research until nothing is left to find out. It ends with ANSWER.md: the answer, how sure it is, the evidence and what to do next. Nothing is merged; prototypes stay on their own branches.",
+  "tags": [
+    "prototypes",
+    "research",
+    "spikes",
+    "worktrees"
+  ],
+  "skills": [
+    "caveman"
+  ],
+  "steps": [
+    {
+      "id": "question",
+      "name": "Ask the question",
+      "type": "user",
+      "instructions": "Say what you want to find out. Your answers become INTENT.md in the scratch directory ({{scratch.dir}}), which every later step reads.",
+      "inputs": [
+        {
+          "id": "question",
+          "label": "What we need to know",
+          "type": "multiline",
+          "help": "The question, or the unknowns, one per line."
+        },
+        {
+          "id": "why",
+          "label": "Why it matters",
+          "type": "multiline",
+          "help": "The decision or work the answer feeds, and what changes depending on it."
+        },
+        {
+          "id": "known",
+          "label": "What we already know",
+          "type": "multiline",
+          "help": "What you've read, tried or ruled out.",
+          "required": false
+        },
+        {
+          "id": "constraints",
+          "label": "Constraints",
+          "type": "multiline",
+          "help": "Anything an answer must respect: platforms, licences, budget, dependencies, deadlines.",
+          "required": false
+        },
+        {
+          "id": "approach",
+          "label": "How to find out",
+          "type": "choice",
+          "options": [
+            "spikes and prototypes",
+            "spikes only",
+            "prototypes only"
+          ],
+          "default": "spikes and prototypes",
+          "help": "Spikes answer by reading (docs, code, the web); prototypes are throwaway code on their own branch."
+        },
+        {
+          "id": "done",
+          "label": "Done when",
+          "type": "multiline",
+          "help": "What a good enough answer looks like.",
+          "required": false
+        },
+        {
+          "id": "dump",
+          "label": "Brain dump",
+          "type": "multiline",
+          "help": "Any other thoughts, links, hunches or worries.",
+          "required": false
+        }
+      ],
+      "outputTemplate": "# Intent: {{ticket.title}}\n\n{{ticket.key}} {{ticket.url}}\n\n{{ticket.body}}\n\n## What we need to know\n\n{{inputs.question}}\n\n## Why it matters\n\n{{inputs.why}}\n\n## What we already know\n\n{{inputs.known}}\n\n## Constraints\n\n{{inputs.constraints}}\n\n## How to find out\n\n{{inputs.approach}}\n\n## Done when\n\n{{inputs.done}}\n\n## Brain dump\n\n{{inputs.dump}}\n",
+      "artifact": "{{scratch.dir}}/INTENT.md",
+      "arrows": [
+        {
+          "to": "research"
+        }
+      ]
+    },
+    {
+      "id": "research",
+      "name": "Research the docs",
+      "use": "grill-docs",
+      "with": {
+        "work": "research question",
+        "extra": "This is research, not a change: under What likely has to change, say instead what each possible answer would change. Give the answer as far as the docs and code settle it, and put every part they don't under Open questions."
+      },
+      "arrows": [
+        {
+          "to": "identify"
+        }
+      ]
+    },
+    {
+      "id": "identify",
+      "name": "Identify spikes or prototypes",
+      "use": "to-spikes",
+      "with": {
+        "work": "research question",
+        "brief": "RESEARCH.md",
+        "extra": "The user wants this settled with: {{steps.question.inputs.approach}}. Don't list the other kind unless the question can't be settled without it, and say why under ## Why."
+      },
+      "arrows": [
+        {
+          "to": "spikes",
+          "when": {
+            "kind": "output",
+            "step": "identify",
+            "matches": "(?m)^Spikes: \\S"
+          },
+          "label": "spikes"
+        },
+        {
+          "to": "prototypes",
+          "when": {
+            "kind": "output",
+            "step": "identify",
+            "matches": "(?m)^Prototypes: \\S"
+          },
+          "label": "prototypes"
+        },
+        {
+          "to": "answer",
+          "when": {
+            "kind": "output",
+            "step": "identify",
+            "matches": "(?m)^NONE\\s*$"
+          },
+          "label": "nothing to try"
+        },
+        {
+          "to": "findings",
+          "when": {
+            "kind": "not",
+            "conditions": [
+              {
+                "kind": "any",
+                "conditions": [
+                  {
+                    "kind": "output",
+                    "step": "identify",
+                    "matches": "(?m)^Spikes: \\S"
+                  },
+                  {
+                    "kind": "output",
+                    "step": "identify",
+                    "matches": "(?m)^Prototypes: \\S"
+                  },
+                  {
+                    "kind": "output",
+                    "step": "identify",
+                    "matches": "(?m)^NONE\\s*$"
+                  }
+                ]
+              }
+            ]
+          },
+          "label": "nothing listed"
+        }
+      ]
+    },
+    {
+      "id": "spikes",
+      "name": "Research the spikes",
+      "type": "workflow",
+      "workflow": "ticket-spike",
+      "forEach": {
+        "kind": "lines",
+        "step": "identify",
+        "pattern": "^Spikes: (.+)$",
+        "separator": ","
+      },
+      "childrenTogether": true,
+      "with": {
+        "ticket": "{{item}}",
+        "brief": "RESEARCH.md"
+      },
+      "arrows": [
+        {
+          "to": "findings"
+        }
+      ]
+    },
+    {
+      "id": "prototypes",
+      "name": "Build the prototypes",
+      "type": "workflow",
+      "workflow": "ticket-prototype",
+      "forEach": {
+        "kind": "lines",
+        "step": "identify",
+        "pattern": "^Prototypes: (.+)$",
+        "separator": ","
+      },
+      "childrenTogether": true,
+      "workspace": "worktree",
+      "mergeBack": false,
+      "with": {
+        "ticket": "{{item}}",
+        "brief": "RESEARCH.md"
+      },
+      "arrows": [
+        {
+          "to": "findings"
+        }
+      ]
+    },
+    {
+      "id": "findings",
+      "name": "Approve the findings",
+      "use": "review-findings",
+      "with": {
+        "work": "research question",
+        "brief": "RESEARCH.md"
+      },
+      "arrows": [
+        {
+          "to": "research",
+          "max": 4,
+          "onLimit": "continue",
+          "label": "another round"
+        },
+        {
+          "to": "answer"
+        }
+      ]
+    },
+    {
+      "id": "answer",
+      "name": "Write the answer",
+      "type": "ai",
+      "advance": "approve",
+      "permissionMode": "default",
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git log:*)",
+        "Bash(git show:*)",
+        "Bash(git status:*)",
+        "Bash(ls:*)",
+        "Bash(git branch:*)"
+      ],
+      "artifact": "{{scratch.dir}}/ANSWER.md",
+      "prompt": "Answer the question for {{ticket.title}}.\n\nRead, in {{scratch.path}}: INTENT.md (the question and why it matters), RESEARCH.md, FINDINGS.md if there is one, and every spike-*.md and prototype-*.md ticket with its _REPORT.md. Do not change any files. Build only on prototypes a person accepted; a rejected prototype's approach is not an answer.\n\n{{feedback}}\n\nReply with ANSWER.md, in markdown, and nothing else:\n\n# Answer: {{ticket.title}}\n## The question\n## The answer\n(short and direct, for each thing we needed to know; say how sure you are and why)\n## Evidence\n(each source, spike and prototype, with what it showed)\n## Prototypes\n(each one's branch, whether a person accepted it, and whether it is worth keeping)\n## What it means\n(for the decision or work in Why it matters)\n## Still unknown\n(and how to find out, or none)\n## Next steps"
+    }
+  ]
+}

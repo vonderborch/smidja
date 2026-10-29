@@ -1,0 +1,44 @@
+{
+  "$schema": "./common-step.schema.json",
+  "schemaVersion": "2.0",
+  "id": "review-findings",
+  "name": "Review the findings",
+  "description": "Gathers what this round's spikes and prototypes found into FINDINGS.md, and lists each prototype's branch for you to try. Its approval is where you accept or reject the prototypes; your feedback is recorded so the next round of research can act on it.",
+  "tags": [
+    "planning",
+    "spikes"
+  ],
+  "parameters": [
+    {
+      "id": "work",
+      "label": "What kind of work this is",
+      "description": "How the prompts name the work, e.g. \"feature\" or \"bug fix\".",
+      "default": "feature"
+    },
+    {
+      "id": "brief",
+      "label": "The document the spikes serve",
+      "description": "The file in the scratch directory that the spikes and prototypes settle questions for, e.g. SPECS.md (the draft specs) or OPTIONS.md (architecture options).",
+      "default": "SPECS.md"
+    }
+  ],
+  "step": {
+    "id": "findings",
+    "name": "Review the findings",
+    "type": "ai",
+    "advance": "approve",
+    "permissionMode": "default",
+    "allowedTools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(git status:*)",
+      "Bash(ls:*)",
+      "Bash(git branch:*)"
+    ],
+    "artifact": "{{scratch.dir}}/FINDINGS.md",
+    "prompt": "The spikes and prototypes for this {{params.work}} ({{ticket.title}}) have run. Prototype branches were kept unmerged, for a person to try.\n\nRead {{scratch.path}}/SPIKES.md, each spike-*.md and prototype-*.md ticket and its _REPORT.md, {{scratch.path}}/{{params.brief}} (the draft they serve), and FINDINGS.md if an earlier round wrote one (keep what it says). Do not change any files.\n\n{{feedback}}\n\nIf the user's feedback above accepts or rejects a prototype, record that and why: a rejected prototype's approach must not be relied on.\n\nReply with FINDINGS.md, in markdown, and nothing else:\n\n# Findings: {{ticket.title}}\n## Spikes\n(each spike: its question and the answer, with sources)\n## Prototypes\n(each prototype: what it tried, what happened, its branch (git branch --list 'afl/*') and how to try it, and whether a person has accepted it: accepted, rejected or waiting)\n## What this means for {{params.brief}}\n(what holds, what has to change, what is still unknown)\n## Still to find out\n(questions for another spike or prototype, or none)"
+  }
+}

@@ -1,0 +1,13 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dc="using:Afl.UI.DataContexts"
+             xmlns:views="using:Afl.UI.Views"
+             x:Class="Afl.UI.Views.StackView"
+             x:DataType="dc:StackDataContext">
+    <StackPanel Spacing="8">
+        <TextBlock FontWeight="SemiBold" Text="Languages" />
+        <views:PickListView DataContext="{Binding Languages}" />
+        <TextBlock FontWeight="SemiBold" Text="Frameworks" Margin="0,6,0,0" />
+        <views:PickListView DataContext="{Binding Frameworks}" />
+    </StackPanel>
+</UserControl>

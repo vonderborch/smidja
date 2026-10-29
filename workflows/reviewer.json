@@ -1,0 +1,50 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "5.0",
+  "id": "reviewer",
+  "name": "Reviewer",
+  "description": "Reviews a change through a single reviewer: the review-<lens> common step, e.g. review-standards (unwritten conventions and judgement), review-specs (does it do what was asked, and no more), review-style (the written style guides) or review-security. The code-review common step runs several of these at once. Add a review-<name> common step to add a reviewer. Read-only; ends with VERDICT: PASS or VERDICT: CHANGES.",
+  "tags": [
+    "review"
+  ],
+  "parameters": [
+    {
+      "id": "lens",
+      "label": "Reviewer",
+      "description": "Which reviewer: the name of a review-<name> common step, e.g. standards, specs, style or security.",
+      "default": "standards"
+    },
+    {
+      "id": "scope",
+      "label": "What to review",
+      "description": "The work to review and where to find it.",
+      "default": "the uncommitted changes for {{ticket.key}} (look at git status and git diff HEAD, and read any new untracked files)"
+    },
+    {
+      "id": "context",
+      "label": "What the change is meant to do",
+      "description": "The ticket, requirements or specs to review against; templates such as {{steps.implement.output}} are fine.",
+      "default": "{{ticket.title}}\n\n{{ticket.body}}"
+    },
+    {
+      "id": "extra",
+      "label": "Anything else to check",
+      "description": "Extra instructions for this reviewer, e.g. what matters most for this kind of change.",
+      "default": ""
+    }
+  ],
+  "skills": [
+    "caveman"
+  ],
+  "steps": [
+    {
+      "id": "review",
+      "use": "review-{{params.lens}}",
+      "with": {
+        "scope": "{{params.scope}}",
+        "context": "{{params.context}}",
+        "extra": "{{params.extra}}"
+      }
+    }
+  ]
+}

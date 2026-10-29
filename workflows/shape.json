@@ -1,0 +1,472 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "5.0",
+  "id": "shape",
+  "name": "Find the shape of an app, package or feature",
+  "description": "Works out the best high-level shape (the main parts, their boundaries, how data and control flow, and where change lands) for something new: an app, a package or a feature. You describe it and what matters (INTENT.md); four researchers then work side by side: this codebase (RESEARCH.md), the general patterns for this kind of thing (PATTERNS.md), similar libraries, projects and features (PRIOR_ART.md), and your own habits from this repo, your other folders and your GitHub (PRACTICES.md). The AI sketches distinct candidate shapes (SHAPES.md); spikes and walking-skeleton prototypes test them, looping back until nothing is left to find out; then it compares them against your priorities (COMPARISON.md) and recommends one as a design to build from (SHAPE.md). Nothing is merged; prototypes stay on their own branches.",
+  "tags": [
+    "architecture",
+    "design",
+    "planning",
+    "prototypes",
+    "research",
+    "spikes"
+  ],
+  "parameters": [
+    {
+      "id": "shapes",
+      "label": "How many shapes",
+      "description": "How many candidate shapes to sketch, e.g. \"3 to 5\" or \"2\".",
+      "default": "3 to 4"
+    }
+  ],
+  "skills": [
+    "caveman"
+  ],
+  "steps": [
+    {
+      "id": "brief",
+      "name": "Describe what we're shaping",
+      "type": "user",
+      "instructions": "Describe the app, package or feature whose shape we're working out, what matters, and where to look for ideas. Your answers become INTENT.md in the scratch directory ({{scratch.dir}}), which every later step reads.",
+      "inputs": [
+        {
+          "id": "subject",
+          "label": "What we're shaping",
+          "type": "multiline",
+          "help": "The app, package or feature, what it must do, and the problem it solves."
+        },
+        {
+          "id": "kind",
+          "label": "What it is",
+          "type": "choice",
+          "options": [
+            "a feature in this codebase",
+            "a package or library",
+            "an app",
+            "a service",
+            "something else"
+          ],
+          "default": "a feature in this codebase",
+          "help": "Sets the scale of the shapes: the parts of a feature, the modules and public API of a package, or the layers and processes of an app or service."
+        },
+        {
+          "id": "users",
+          "label": "Who or what uses it",
+          "type": "multiline",
+          "help": "People, other code, other services: how they reach it and what they expect of it.",
+          "required": false
+        },
+        {
+          "id": "priorities",
+          "label": "What matters most",
+          "type": "multichoice",
+          "options": [
+            "simplicity",
+            "maintainability",
+            "extensibility",
+            "performance",
+            "scalability",
+            "reliability",
+            "security",
+            "cost to run",
+            "time to deliver",
+            "team familiarity",
+            "operability and observability",
+            "portability"
+          ],
+          "help": "Pick the qualities the choice should be judged on."
+        },
+        {
+          "id": "weights",
+          "label": "Ranking or weights",
+          "type": "multiline",
+          "help": "Rank the picks, most important first, or give each a weight (e.g. extensibility 5, simplicity 3). Unranked picks count equally.",
+          "required": false
+        },
+        {
+          "id": "change",
+          "label": "What's likely to change",
+          "type": "multiline",
+          "help": "What will be added, swapped or grown later: new kinds of things, new back ends, more users. The shape should make these easy.",
+          "required": false
+        },
+        {
+          "id": "constraints",
+          "label": "Hard constraints",
+          "type": "multiline",
+          "help": "Must-haves a shape is ruled out for missing: platforms, languages, licences, dependencies, compatibility, budget.",
+          "required": false
+        },
+        {
+          "id": "scale",
+          "label": "Expected scale",
+          "type": "multiline",
+          "help": "Load, data size, users, team size, and how they're expected to grow.",
+          "required": false
+        },
+        {
+          "id": "folders",
+          "label": "Your other code to learn from",
+          "type": "multiline",
+          "help": "Folders on this machine, one per line (e.g. ~/Projects/other-app): projects whose structure and habits the shapes should learn from. The AI only reads them.",
+          "required": false
+        },
+        {
+          "id": "online",
+          "label": "Your code online",
+          "type": "multiline",
+          "help": "GitHub users, organisations or repos, one per line (e.g. octocat or octocat/hello-world), to learn your habits from.",
+          "required": false
+        },
+        {
+          "id": "known",
+          "label": "Similar things you know of",
+          "type": "multiline",
+          "help": "Libraries, products, projects or patterns that do something like this, and what you like or dislike about them.",
+          "required": false
+        },
+        {
+          "id": "dump",
+          "label": "Brain dump",
+          "type": "multiline",
+          "help": "Shapes you already have in mind, links, hunches, worries.",
+          "required": false
+        }
+      ],
+      "outputTemplate": "# Intent: {{ticket.title}}\n\n{{ticket.key}} {{ticket.url}}\n\n{{ticket.body}}\n\n## What we're shaping\n\n{{inputs.subject}}\n\n## What it is\n\n{{inputs.kind}}\n\n## Who or what uses it\n\n{{inputs.users}}\n\n## What matters most\n\n{{inputs.priorities}}\n\n## Ranking or weights\n\n{{inputs.weights}}\n\n## What's likely to change\n\n{{inputs.change}}\n\n## Hard constraints\n\n{{inputs.constraints}}\n\n## Expected scale\n\n{{inputs.scale}}\n\n## Your other code\n\n{{inputs.folders}}\n\n## Your code online\n\n{{inputs.online}}\n\n## Similar things you know of\n\n{{inputs.known}}\n\n## Brain dump\n\n{{inputs.dump}}\n",
+      "artifact": "{{scratch.dir}}/INTENT.md",
+      "arrows": [
+        {
+          "to": "research"
+        },
+        {
+          "to": "patterns"
+        },
+        {
+          "to": "prior-art"
+        },
+        {
+          "to": "practices"
+        }
+      ]
+    },
+    {
+      "id": "research",
+      "name": "Research this codebase",
+      "use": "grill-docs",
+      "with": {
+        "work": "design",
+        "extra": "We're working out the high-level shape of {{steps.brief.inputs.kind}}, not a change to one part. Map what it would sit beside: the repo's overall structure and layers, its extension mechanisms (base classes, registries, plugins, events), and anything here that already does part of the job and could be reused, generalised or learned from. If the repo is empty or new, say so and keep this short. Under What likely has to change, say where each part of the new thing could live."
+      },
+      "arrows": [
+        {
+          "to": "shapes"
+        }
+      ]
+    },
+    {
+      "id": "patterns",
+      "name": "Research the patterns",
+      "type": "ai",
+      "ask": true,
+      "permissionMode": "default",
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git log:*)",
+        "Bash(git show:*)",
+        "Bash(git status:*)",
+        "Bash(ls:*)",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "artifact": "{{scratch.dir}}/PATTERNS.md",
+      "prompt": "Research the general architectural patterns that suit this: {{ticket.title}}.\n\nRead {{scratch.path}}/INTENT.md first: what we're shaping, what it is, what matters most and what's likely to change. Do not change any files.\n\n{{feedback}}\n\nFind the patterns and architectural styles people use for this kind of thing at this scale: for an app or service, its layering, processes and how its parts talk; for a package, its public API, module boundaries and extension points; for a feature, how its parts divide the work and plug into the code around it. Use well-regarded books, papers, talks, documentation and engineering write-ups, and say where each claim comes from. Prefer a few patterns that really fit over a catalogue, and include the anti-patterns that commonly go wrong here. Ask the user if what we're shaping is too vague to tell which patterns apply.\n\nReply with PATTERNS.md, in markdown, and nothing else:\n\n# Patterns: {{ticket.title}}\n## What kind of problem this is\n(the forces at play, in a few lines)\n## Pattern N: <name>\n(one section each, with: ### What it is; ### When it fits; ### When it doesn't; ### What it makes easy and hard to change; ### Against what matters most (one line per priority); ### Sources)\n## Anti-patterns\n(what commonly goes wrong with this kind of thing, and the warning signs)\n## Sources\n(each with one line on what it told you)",
+      "arrows": [
+        {
+          "to": "shapes"
+        }
+      ]
+    },
+    {
+      "id": "prior-art",
+      "name": "Research the prior art",
+      "type": "ai",
+      "ask": true,
+      "permissionMode": "default",
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git log:*)",
+        "Bash(git show:*)",
+        "Bash(git status:*)",
+        "Bash(ls:*)",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "artifact": "{{scratch.dir}}/PRIOR_ART.md",
+      "prompt": "Find the prior art for this: {{ticket.title}}.\n\nRead {{scratch.path}}/INTENT.md first, including the similar things the user knows of. Do not change any files, and don't download or run anything.\n\n{{feedback}}\n\nFind existing things that do the same job or part of it: open-source projects, libraries and frameworks, products, and well-known features of other apps. For each, find out how it is shaped (its parts, boundaries, public API and extension points, from its docs, source and design notes) and what its users say about that shape (issues, discussions, write-ups). Note which could be used rather than built, and their licence, maintenance and size. Look in this repo too: a feature here that already solves a similar problem. Ask the user if you find several very different readings of what we're shaping.\n\nReply with PRIOR_ART.md, in markdown, and nothing else:\n\n# Prior art: {{ticket.title}}\n## In this repo\n(similar features or code here, or none)\n## Prior art N: <name>\n(one section each, with: ### What it is (link); ### How it's shaped (a mermaid sketch if it helps); ### What works well; ### What its users struggle with; ### Use it, borrow from it, or just learn from it (with its licence, maintenance and size when it could be used))\n## Lessons\n(what the prior art agrees on, and where it differs)\n## Sources\n(each with one line on what it told you)",
+      "arrows": [
+        {
+          "to": "shapes"
+        }
+      ]
+    },
+    {
+      "id": "practices",
+      "name": "Learn your practices",
+      "type": "ai",
+      "ask": true,
+      "permissionMode": "default",
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git log:*)",
+        "Bash(git show:*)",
+        "Bash(git status:*)",
+        "Bash(ls:*)",
+        "Bash(gh repo list:*)",
+        "Bash(gh repo view:*)",
+        "Bash(gh search repos:*)",
+        "Bash(gh search code:*)",
+        "WebFetch(domain:github.com)",
+        "WebFetch(domain:raw.githubusercontent.com)"
+      ],
+      "directories": [
+        "{{steps.brief.inputs.folders}}"
+      ],
+      "artifact": "{{scratch.dir}}/PRACTICES.md",
+      "prompt": "Work out how the user likes to build things, so the shapes for {{ticket.title}} fit their habits.\n\nRead {{scratch.path}}/INTENT.md first. Do not change any files, and don't clone, download or run anything.\n\n{{feedback}}\n\nLearn from:\n- this repo: its CLAUDE.md and other agent instructions, style guides, CONTRIBUTING, and how its code is actually structured;\n- the instructions you were given about the user's preferences, if any;\n- the user's other code on this machine, if they listed any:\n{{steps.brief.inputs.folders}}\n- the user's code online, if they listed any (use gh repo list, gh repo view, gh search and GitHub pages; read the repos' READMEs and a few representative source files, not everything):\n{{steps.brief.inputs.online}}\n\nLook for habits that bear on the shape of things: how they split code into projects, packages and modules; abstractions they reach for (base classes, generics, interfaces, registries, plugins, events); how they name and lay things out; how they handle configuration, errors, persistence and dependencies; how they test; and the libraries and frameworks they use again and again. Find anything they've built before that is like this. Separate what they clearly always do from what they did once, and say where you saw each. Ask the user when two of their projects disagree on something that would change the shapes.\n\nReply with PRACTICES.md, in markdown, and nothing else:\n\n# Practices: {{ticket.title}}\n## Sources read\n(each folder, repo and document, with one line on what it told you)\n## Habits\n(grouped: structure, abstractions, naming and layout, configuration and errors, persistence, dependencies, testing; each habit with how sure you are and where you saw it)\n## Things they've built like this\n(each with how it was shaped and what to reuse or learn from it, or none)\n## What the shapes should respect\n(the habits a good shape follows, most important first)",
+      "arrows": [
+        {
+          "to": "shapes"
+        }
+      ]
+    },
+    {
+      "id": "shapes",
+      "name": "Sketch the shapes",
+      "type": "ai",
+      "advance": "approve",
+      "ask": true,
+      "permissionMode": "default",
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git log:*)",
+        "Bash(git show:*)",
+        "Bash(git status:*)",
+        "Bash(ls:*)",
+        "WebSearch",
+        "WebFetch"
+      ],
+      "artifact": "{{scratch.dir}}/SHAPES.md",
+      "prompt": "Sketch candidate high-level shapes for this: {{ticket.title}}.\n\nRead, in {{scratch.path}}: INTENT.md (what we're shaping and what matters), RESEARCH.md (this codebase), PATTERNS.md (the general patterns), PRIOR_ART.md (similar things and how they're shaped) and PRACTICES.md (how the user likes to build). If this is a later round there is also SHAPES.md, FINDINGS.md and the spike and prototype reports (*_REPORT.md): revise SHAPES.md with what they found rather than starting over. A finding beats a guess; a prototype a person rejected rules its approach out. Read code, docs and the web as far as you need to. Do not change any files.\n\n{{feedback}}\n\nA shape is the big picture, not the detail: the main parts and what each owns, the boundaries between them, how data and control flow, where it plugs into what's around it, and where the expected changes land. Give {{params.shapes}} shapes that really differ, not variations of one; each may combine patterns and borrow from the prior art, and at least one should follow the user's practices closely. If a library from the prior art could do most of the job, make using it one of the shapes. Drop any shape that breaks a hard constraint and say so under Ruled out. Ask the user when what matters leaves something open that would change the shapes.\n\nReply with SHAPES.md, in markdown, and nothing else:\n\n# Shapes: {{ticket.title}}\n## What we're shaping\n(in a few lines, with the forces that matter)\n## Shape N: <name>\n(one section each, with: ### In a sentence; ### Sketch (a mermaid diagram of the parts, their boundaries and how data and control flow); ### The parts (each part's job, what it owns and what it depends on); ### Where change lands (each likely change from INTENT.md, and what it touches in this shape); ### Built on (the patterns, prior art and the user's own code it draws on; what it reuses and what it builds); ### Fit with your practices; ### Strengths; ### Weaknesses; ### Risks; ### Against what matters most (one line per priority); ### Unproven claims (what must be true for this shape to work that nobody has checked))\n## Side by side\n(a table: shapes as rows; parts, main pattern, what it reuses, the hardest likely change)\n## Ruled out\n(each shape dropped and why)\n## Open questions\n(numbered, each question in bold followed by the assumption you made; leave the section out when there are none)",
+      "arrows": [
+        {
+          "to": "identify"
+        }
+      ]
+    },
+    {
+      "id": "identify",
+      "name": "Identify spikes or prototypes",
+      "use": "to-spikes",
+      "with": {
+        "work": "design",
+        "brief": "SHAPES.md",
+        "extra": "Prefer what would change which shape wins: a shape's unproven claims, whether a library from the prior art really does what it needs, and how a shape feels to use and extend. A good prototype here is a walking skeleton: a shape's parts and the seams between them with stub insides, plus one of the likely changes made through it, so a person can compare shapes in practice. Keep each prototype to one shape."
+      },
+      "arrows": [
+        {
+          "to": "spikes",
+          "when": {
+            "kind": "output",
+            "step": "identify",
+            "matches": "(?m)^Spikes: \\S"
+          },
+          "label": "spikes"
+        },
+        {
+          "to": "prototypes",
+          "when": {
+            "kind": "output",
+            "step": "identify",
+            "matches": "(?m)^Prototypes: \\S"
+          },
+          "label": "prototypes"
+        },
+        {
+          "to": "compare",
+          "when": {
+            "kind": "output",
+            "step": "identify",
+            "matches": "(?m)^NONE\\s*$"
+          },
+          "label": "nothing to try"
+        },
+        {
+          "to": "findings",
+          "when": {
+            "kind": "not",
+            "conditions": [
+              {
+                "kind": "any",
+                "conditions": [
+                  {
+                    "kind": "output",
+                    "step": "identify",
+                    "matches": "(?m)^Spikes: \\S"
+                  },
+                  {
+                    "kind": "output",
+                    "step": "identify",
+                    "matches": "(?m)^Prototypes: \\S"
+                  },
+                  {
+                    "kind": "output",
+                    "step": "identify",
+                    "matches": "(?m)^NONE\\s*$"
+                  }
+                ]
+              }
+            ]
+          },
+          "label": "nothing listed"
+        }
+      ]
+    },
+    {
+      "id": "spikes",
+      "name": "Research the spikes",
+      "type": "workflow",
+      "workflow": "ticket-spike",
+      "forEach": {
+        "kind": "lines",
+        "step": "identify",
+        "pattern": "^Spikes: (.+)$",
+        "separator": ","
+      },
+      "childrenTogether": true,
+      "with": {
+        "ticket": "{{item}}",
+        "brief": "SHAPES.md"
+      },
+      "arrows": [
+        {
+          "to": "findings"
+        }
+      ]
+    },
+    {
+      "id": "prototypes",
+      "name": "Build the prototypes",
+      "type": "workflow",
+      "workflow": "ticket-prototype",
+      "forEach": {
+        "kind": "lines",
+        "step": "identify",
+        "pattern": "^Prototypes: (.+)$",
+        "separator": ","
+      },
+      "childrenTogether": true,
+      "workspace": "worktree",
+      "mergeBack": false,
+      "with": {
+        "ticket": "{{item}}",
+        "brief": "SHAPES.md"
+      },
+      "arrows": [
+        {
+          "to": "findings"
+        }
+      ]
+    },
+    {
+      "id": "findings",
+      "name": "Approve the findings",
+      "use": "review-findings",
+      "with": {
+        "work": "design",
+        "brief": "SHAPES.md"
+      },
+      "arrows": [
+        {
+          "to": "shapes",
+          "max": 4,
+          "onLimit": "continue",
+          "label": "another round"
+        },
+        {
+          "to": "compare"
+        }
+      ]
+    },
+    {
+      "id": "compare",
+      "name": "Compare the shapes",
+      "type": "ai",
+      "ask": true,
+      "permissionMode": "default",
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git log:*)",
+        "Bash(git show:*)",
+        "Bash(git status:*)",
+        "Bash(ls:*)"
+      ],
+      "artifact": "{{scratch.dir}}/COMPARISON.md",
+      "prompt": "Compare the shapes for {{ticket.title}} against what matters to the user.\n\nRead, in {{scratch.path}}: INTENT.md (what matters, the ranking or weights, and what's likely to change), SHAPES.md, PRACTICES.md, FINDINGS.md if there is one, and the spike and prototype reports (*_REPORT.md). Do not change any files.\n\n{{feedback}}\n\nTurn what matters into criteria with weights: use the user's weights as given; for a ranking, weight the first highest and go down evenly; unranked picks count equally. Add fit with the user's practices as a criterion unless they ranked it out. Ask the user if the ranking is unclear. Score each shape 1 to 5 on each criterion, with a short reason that cites the shapes, the research or a finding; an unproven claim scores as uncertain, not as true, and a prototype a person accepted counts as evidence. Hard constraints are pass or fail, not weights. Then walk each likely change through each shape: what it touches and how hard it is.\n\nReply with COMPARISON.md, in markdown, and nothing else:\n\n# Comparison: {{ticket.title}}\n## Criteria and weights\n(and where each weight came from)\n## Scores\n(a table: shapes as rows, criteria as columns, then the weighted total)\n## Reasons\n(per shape, per criterion, one line each)\n## Likely changes\n(a table: changes as rows, shapes as columns, each cell what it touches and how hard)\n## Sensitivity\n(would a reasonable change to the weights change the winner? which weight decides it?)\n## Confidence\n(which scores rest on evidence and which on judgement)",
+      "arrows": [
+        {
+          "to": "recommend"
+        }
+      ]
+    },
+    {
+      "id": "recommend",
+      "name": "Recommend a shape",
+      "type": "ai",
+      "advance": "approve",
+      "permissionMode": "default",
+      "allowedTools": [
+        "Read",
+        "Grep",
+        "Glob",
+        "Bash(git log:*)",
+        "Bash(git show:*)",
+        "Bash(git status:*)",
+        "Bash(ls:*)",
+        "Bash(git branch:*)"
+      ],
+      "skipSkills": [
+        "caveman"
+      ],
+      "artifact": "{{scratch.dir}}/SHAPE.md",
+      "prompt": "Recommend a shape for {{ticket.title}}, written up as the design people will build from.\n\nRead, in {{scratch.path}}: INTENT.md, RESEARCH.md, PATTERNS.md, PRIOR_ART.md, PRACTICES.md, SHAPES.md, COMPARISON.md, FINDINGS.md if there is one, and the spike and prototype reports (*_REPORT.md). Do not change any files.\n\n{{feedback}}\n\nRecommend the shape that best fits what matters to the user, as compared; a shape may take the best of another, if you say what and why. If you'd pick a different one than the scores do, say so and why, but put the user's priorities first. If the user's feedback above asks for another shape or changes what matters, follow it. Stay at the level of the shape: parts, boundaries, flows and seams, not classes and methods.\n\nReply with SHAPE.md, in markdown, and nothing else:\n\n# Shape: {{ticket.title}}\n## Status\nProposed\n## In a paragraph\n## Sketch\n(a mermaid diagram of the parts, their boundaries and how data and control flow)\n## The parts\n(each part: its job, what it owns, what it exposes, what it depends on)\n## Seams and extension points\n(where each likely change lands, and how it's added)\n## Key decisions\n(each: the decision, the alternatives and why this one, with the evidence)\n## Built on\n(the patterns, the libraries it uses, and what it borrows from prior art and the user's own code)\n## Why not the other shapes\n## Left out on purpose\n(what this shape doesn't do yet, and how it could later)\n## Risks\n(and how to watch for or soften each)\n## Prototypes\n(each one's branch, whether a person accepted it, and whether it's worth keeping as a starting point)\n## First steps\n(the walking skeleton to build first, and what to prove early)\n## Revisit when\n(what would make this the wrong shape)",
+      "arrows": [
+        {
+          "to": "save"
+        }
+      ]
+    },
+    {
+      "id": "save",
+      "name": "Save the design",
+      "type": "ai",
+      "permissionMode": "acceptEdits",
+      "optional": {
+        "default": false,
+        "help": "Saves the approved shape as a design document in the repo, where it keeps them (e.g. docs/architecture or docs/design)."
+      },
+      "prompt": "Save the approved shape, {{scratch.path}}/SHAPE.md, as a design document in this repo.\n\nFind where the repo keeps design documents or architecture notes (docs/architecture, docs/design, docs/adr, or what CLAUDE.md or the docs say). If there is none, use docs/architecture. Follow the existing documents' naming, numbering and layout; if there are none, name it <short-title>.md and keep SHAPE.md's layout. Set its status to Accepted and add today's date. Change nothing else, and don't commit.\n\nReport the file you wrote."
+    }
+  ]
+}

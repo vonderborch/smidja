@@ -1,0 +1,48 @@
+{
+  "$schema": "./common-step.schema.json",
+  "schemaVersion": "2.0",
+  "id": "review-style",
+  "name": "Style review",
+  "description": "Reviews a change against the written style guides: CLAUDE.md and other agent instructions, CONTRIBUTING, .editorconfig, linter and formatter configs, and documented conventions, citing the rule each finding breaks. Read-only; one reviewer of the code-review common step and the reviewer workflow (lens \"style\"). Takes scope, context and extra. Ends with VERDICT: PASS or VERDICT: CHANGES.",
+  "tags": [
+    "review",
+    "reviewer"
+  ],
+  "parameters": [
+    {
+      "id": "scope",
+      "label": "What to review",
+      "description": "The work to review and where to find it.",
+      "default": "the uncommitted changes for {{ticket.key}} (look at git status and git diff HEAD, and read any new untracked files)"
+    },
+    {
+      "id": "context",
+      "label": "What the change is meant to do",
+      "description": "The ticket, requirements or specs to review against; templates such as {{steps.implement.output}} are fine.",
+      "default": "{{ticket.title}}\n\n{{ticket.body}}"
+    },
+    {
+      "id": "extra",
+      "label": "Anything else to check",
+      "description": "Extra instructions for this reviewer, e.g. what matters most for this kind of change.",
+      "default": ""
+    }
+  ],
+  "step": {
+    "id": "review",
+    "name": "Style review",
+    "type": "ai",
+    "permissionMode": "default",
+    "allowedTools": [
+      "Read",
+      "Grep",
+      "Glob",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(ls:*)"
+    ],
+    "prompt": "Review {{params.scope}} through the style lens, and only that lens: other reviewers cover the rest. Do not change any files.\n\nWhat it is meant to do:\n\n{{params.context}}\n\nReview it against the written style guides: CLAUDE.md and other agent instructions, CONTRIBUTING, .editorconfig, linter and formatter configs, and conventions documented in the repo. Find and read them first. Cite the rule (file and line) each finding breaks; something no written rule covers isn't a finding for you.\n\n{{params.extra}}\n\nList each finding with its severity (blocker, major, minor, nit), a file reference and the fix. Then end with a line that is exactly `VERDICT: CHANGES` if anything blocker or major is left, otherwise exactly `VERDICT: PASS`."
+  }
+}

@@ -1,0 +1,48 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dc="using:Afl.UI.DataContexts"
+             x:Class="Afl.UI.Views.TagFilterView"
+             x:DataType="dc:TagFilterDataContext"
+             IsVisible="{Binding IsVisible}">
+    <StackPanel Spacing="6">
+        <!-- Picked tags: click one to remove it -->
+        <ItemsControl ItemsSource="{Binding Selected}" IsVisible="{Binding HasSelected}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel ItemSpacing="4" LineSpacing="4" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                    <Button Classes="tag picked" Content="{Binding StringFormat='{}{0}  ✕'}" Click="OnRemove"
+                            ToolTip.Tip="Stop filtering by this tag" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <!-- Every other tag, searchable -->
+        <AutoCompleteBox x:Name="SearchBox" ItemsSource="{Binding Choices}" IsVisible="{Binding HasChoices}"
+                         PlaceholderText="{Binding SearchPlaceholder}" MinimumPrefixLength="0" FilterMode="Contains"
+                         GotFocus="OnSearchFocused" DropDownClosed="OnSearchClosed" KeyDown="OnSearchKeyDown">
+            <AutoCompleteBox.ItemTemplate>
+                <DataTemplate x:DataType="dc:TagChoice">
+                    <DockPanel>
+                        <TextBlock DockPanel.Dock="Right" Classes="meta" Text="{Binding Count}" Margin="12,0,0,0" />
+                        <TextBlock Text="{Binding Tag}" />
+                    </DockPanel>
+                </DataTemplate>
+            </AutoCompleteBox.ItemTemplate>
+        </AutoCompleteBox>
+
+        <!-- The most common tags, one click each -->
+        <ItemsControl ItemsSource="{Binding Suggestions}">
+            <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><WrapPanel ItemSpacing="4" LineSpacing="4" /></ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="dc:TagChoice">
+                    <Button Classes="tag" Content="{Binding Label, StringFormat='+ {0}'}" Click="OnAddSuggestion"
+                            ToolTip.Tip="Only show the ones with this tag" />
+                </DataTemplate>
+            </ItemsControl.ItemTemplate>
+        </ItemsControl>
+    </StackPanel>
+</UserControl>

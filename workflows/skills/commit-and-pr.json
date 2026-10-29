@@ -1,0 +1,12 @@
+{
+  "$schema": "./skill.schema.json",
+  "schemaVersion": "1.1",
+  "id": "commit-and-pr",
+  "name": "Commits and PRs",
+  "description": "How to write commits and pull requests: small focused commits with Conventional Commit messages, and PR descriptions that say what, why and how it was tested. Use for steps that commit or open a PR.",
+  "tags": [
+    "git",
+    "pull-request"
+  ],
+  "content": "# Commits and pull requests\n\n## Commits\n\n- One logical change per commit; it should build and pass tests on its own.\n- Follow the repo's existing style. If it has none, use Conventional Commits: `type(scope): summary`, with type one of `feat`, `fix`, `refactor`, `test`, `docs`, `build`, `ci`, `chore`, `perf`.\n- Summary in the imperative, at most about 72 characters, no trailing period: `fix(checkout): keep order unpaid when the card is declined`.\n- Body (after a blank line) explains why, and anything a reviewer would otherwise ask. Reference the ticket (`Refs ABC-123`, `Fixes #42`).\n- Mark breaking changes with `!` after the type and a `BREAKING CHANGE:` line.\n- Never commit secrets, generated build output, local config or large binaries. Check `git status` and `git diff --staged` first.\n\n## Pull requests\n\n- Title like a good commit summary.\n- Description:\n  - **What** changed, in a few bullets.\n  - **Why**: the problem or ticket.\n  - **How it was tested**: the tests added, what you ran, anything checked by hand.\n  - **Risks and follow-ups**: migrations, config, flags, things deliberately left out.\n- Keep it small enough to review in one sitting; split unrelated changes into separate PRs.\n- Don't force-push over review comments without saying so; don't merge your own PR unless the repo allows it.\n"
+}

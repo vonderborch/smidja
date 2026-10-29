@@ -1,0 +1,81 @@
+{
+  "$schema": "./workflow.schema.json",
+  "schemaVersion": "5.0",
+  "id": "bugfix",
+  "name": "Bug fix",
+  "description": "Reproduce, diagnose, fix and verify a defect.",
+  "tags": [
+    "bug",
+    "fix"
+  ],
+  "steps": [
+    {
+      "id": "diagnose",
+      "name": "Reproduce and diagnose",
+      "type": "ai",
+      "advance": "approve",
+      "permissionMode": "default",
+      "prompt": "Investigate the bug reported in {{ticket.key}}: {{ticket.title}}\n\n{{ticket.body}}\n\nFind reliable reproduction steps and the root cause (not just the symptom). Report: repro steps, observed vs expected behaviour, the root cause with file references, and the fix you propose. Do not change any files.",
+      "arrows": [
+        {
+          "to": "fix"
+        }
+      ]
+    },
+    {
+      "id": "fix",
+      "name": "Fix with a regression test",
+      "type": "ai",
+      "prompt": "Fix {{ticket.key}}. The approved diagnosis:\n\n{{steps.diagnose.output}}\n\nFirst write a regression test that fails because of the bug, then make the minimal fix so it passes. Run the full test suite and report what you changed and the test results.",
+      "arrows": [
+        {
+          "to": "verify"
+        }
+      ]
+    },
+    {
+      "id": "verify",
+      "name": "Verify the fix",
+      "type": "user",
+      "instructions": "Check the fix for {{ticket.key}} in a realistic environment: follow the original repro steps and confirm the bug is gone.\n\nWhat the AI changed:\n{{steps.fix.output}}",
+      "inputs": [
+        {
+          "id": "fixed",
+          "label": "Is the bug gone when you follow the repro steps?",
+          "type": "confirm"
+        },
+        {
+          "id": "tested-in",
+          "label": "Where did you check it?",
+          "type": "choice",
+          "options": [
+            "local",
+            "staging",
+            "production"
+          ],
+          "default": "local"
+        }
+      ],
+      "arrows": [
+        {
+          "to": "pr"
+        }
+      ]
+    },
+    {
+      "id": "pr",
+      "name": "Open a PR and get it reviewed",
+      "type": "user",
+      "instructions": "Open a pull request for {{ticket.key}} that links {{ticket.url}}, and get it reviewed and approved.",
+      "inputs": [
+        {
+          "id": "url",
+          "label": "Pull request URL",
+          "type": "text",
+          "required": false,
+          "help": "Recorded on the run so it links to the PR."
+        }
+      ]
+    }
+  ]
+}

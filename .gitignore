@@ -1,0 +1,8 @@
+bin/
+obj/
+tool/nupkg/
+*.user
+.idea/
+.vs/
+.DS_Store
+.afl/

@@ -1,0 +1,646 @@
+<niddy:Page xmlns="https://github.com/avaloniaui"
+            xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+            xmlns:niddy="https://github.com/vonderborch/Niddy"
+            xmlns:dc="using:Afl.UI.DataContexts"
+            xmlns:runs="using:Afl.Core.Runs"
+            xmlns:views="using:Afl.UI.Views"
+            x:Class="Afl.UI.Pages.RunsPage"
+            x:DataType="dc:RunsPageDataContext">
+
+    <niddy:Page.Resources>
+        <!-- One step of a run: the timeline lists these, and the graph's popup shows one -->
+        <DataTemplate x:Key="StepCard" x:DataType="runs:RunStep">
+            <Border Classes="step"
+                    Classes.skipped="{Binding Status, Converter={x:Static dc:UiConverters.IsSkipped}}">
+                <StackPanel Spacing="4">
+                    <DockPanel>
+                        <Button DockPanel.Dock="Right" Content="Replay…" Click="OnReplay" Padding="8,2"
+                                FontSize="12" IsVisible="{Binding HasRun}"
+                                IsEnabled="{Binding $parent[niddy:Page].((dc:RunsPageDataContext)DataContext).CanReplay}"
+                                ToolTip.Tip="Redo this step (and the steps after it), optionally with feedback" />
+                        <StackPanel Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <TextBlock Text="{Binding Name}" FontWeight="SemiBold" />
+                            <TextBlock Classes="meta">
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{x:Static dc:UiConverters.StepStatusText}">
+                                        <Binding />
+                                        <Binding Path="$parent[niddy:Page].((dc:RunsPageDataContext)DataContext).SelectedRun" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                            <TextBlock Classes="meta">
+                                <TextBlock.Text>
+                                    <MultiBinding Converter="{x:Static dc:UiConverters.Iteration}">
+                                        <Binding />
+                                        <Binding Path="$parent[niddy:Page].((dc:RunsPageDataContext)DataContext).SelectedRun" />
+                                    </MultiBinding>
+                                </TextBlock.Text>
+                            </TextBlock>
+                            <TextBlock Classes="meta" Text="{Binding Attempts, StringFormat='attempt {0}'}"
+                                       IsVisible="{Binding Attempts, Converter={x:Static dc:UiConverters.IsMoreThanOne}}" />
+                            <TextBlock Classes="meta" Text="{Binding Replays, StringFormat='replayed {0}×'}"
+                                       IsVisible="{Binding !!Replays}" />
+                        </StackPanel>
+                    </DockPanel>
+                    <views:MarkdownView Classes="prompt" Markdown="{Binding PendingPrompt, Mode=OneWay}"
+                                        Title="{Binding Name, StringFormat='Prompt for {0}'}"
+                                        IsVisible="{Binding PendingPrompt, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <views:MarkdownView Markdown="{Binding Output, Mode=OneWay}" Title="{Binding Name}"
+                                        IsVisible="{Binding Output, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <TextBlock Text="{Binding Answers, Converter={x:Static dc:UiConverters.AnswerLines}}"
+                               Classes="meta" TextWrapping="Wrap"
+                               IsVisible="{Binding !!Answers.Count}" />
+                    <TextBlock Text="{Binding AgentChoice, Converter={x:Static dc:UiConverters.AgentChoiceLine}}"
+                               Classes="meta" TextWrapping="Wrap"
+                               IsVisible="{Binding AgentChoice, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                    <TextBlock Text="{Binding AskRounds, Converter={x:Static dc:UiConverters.AskRoundLines}}"
+                               Classes="meta" TextWrapping="Wrap"
+                               IsVisible="{Binding !!AskRounds.Count}" />
+                    <TextBlock Text="{Binding Delegations, Converter={x:Static dc:UiConverters.DelegationLines}}"
+                               Classes="meta" TextWrapping="Wrap"
+                               IsVisible="{Binding !!Delegations.Count}" />
+                    <ItemsControl ItemsSource="{Binding CreatedTickets}" IsVisible="{Binding !!CreatedTickets.Count}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="runs:CreatedTicket">
+                                <DockPanel>
+                                    <HyperlinkButton DockPanel.Dock="Right" Content="Open" NavigateUri="{Binding Url}" Padding="6,0"
+                                                     IsVisible="{Binding Url, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    <TextBlock Classes="meta" TextWrapping="Wrap" Text="{Binding Converter={x:Static dc:UiConverters.CreatedTicketLine}}" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding ChildRuns}" IsVisible="{Binding !!ChildRuns.Count}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="runs:ChildRun">
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Content="Open" Padding="8,2" FontSize="12"
+                                            Tag="{Binding RunId}" Click="OnOpenChild"
+                                            ToolTip.Tip="Select this child run" />
+                                    <TextBlock Classes="meta" TextWrapping="Wrap" VerticalAlignment="Center"
+                                               Text="{Binding Converter={x:Static dc:UiConverters.ChildRunLine}}" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding Paths}" IsVisible="{Binding !!Paths.Count}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="runs:ChildRun">
+                                <DockPanel>
+                                    <Button DockPanel.Dock="Right" Content="Open" Padding="8,2" FontSize="12"
+                                            Tag="{Binding RunId}" Click="OnOpenChild"
+                                            ToolTip.Tip="Select this path run, to act on its step" />
+                                    <TextBlock Classes="meta" TextWrapping="Wrap" VerticalAlignment="Center"
+                                               Text="{Binding Converter={x:Static dc:UiConverters.ChildRunLine}}" />
+                                </DockPanel>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <StackPanel Orientation="Horizontal" Spacing="6"
+                                IsVisible="{Binding ArtifactPath, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                        <TextBlock Classes="meta" VerticalAlignment="Center" Text="{Binding ArtifactPath, StringFormat='Saved to {0}'}" />
+                        <HyperlinkButton Content="Preview" Padding="0" Click="OnPreviewArtifact"
+                                         IsVisible="{Binding ArtifactPath, Converter={x:Static dc:UiConverters.IsMarkdownPath}}"
+                                         ToolTip.Tip="Read the saved document formatted" />
+                        <HyperlinkButton Content="Open" Padding="0" ToolTip.Tip="Open the saved file">
+                            <HyperlinkButton.NavigateUri>
+                                <MultiBinding Converter="{x:Static dc:UiConverters.ArtifactUri}">
+                                    <Binding />
+                                    <Binding Path="$parent[niddy:Page].((dc:RunsPageDataContext)DataContext).SelectedRun" />
+                                </MultiBinding>
+                            </HyperlinkButton.NavigateUri>
+                        </HyperlinkButton>
+                    </StackPanel>
+                    <Expander Header="Each agent's result" HorizontalAlignment="Stretch"
+                              IsVisible="{Binding Candidates, Converter={x:Static ObjectConverters.IsNotNull}}">
+                        <ItemsControl ItemsSource="{Binding Candidates}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="runs:StepCandidate">
+                                    <StackPanel Spacing="2">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Text="{Binding Agent}" FontWeight="SemiBold" />
+                                            <TextBlock Classes="meta" Text="{Binding Status, Converter={x:Static dc:UiConverters.Words}}" />
+                                        </StackPanel>
+                                        <views:MarkdownView Markdown="{Binding Output, Mode=OneWay}" Title="{Binding Agent, StringFormat='Result from {0}'}"
+                                                            IsVisible="{Binding Output, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        <TextBlock Text="{Binding Error}" Classes="error" Margin="0" TextWrapping="Wrap"
+                                                   IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Expander>
+                    <TextBlock Text="{Binding Error}" Classes="error" Margin="0"
+                               IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    <ItemsControl ItemsSource="{Binding Feedback}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <TextBlock Classes="meta" TextWrapping="Wrap" Text="{Binding StringFormat='Feedback: {0}'}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <ItemsControl ItemsSource="{Binding Notes}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="x:String">
+                                <TextBlock Classes="meta" TextWrapping="Wrap" Text="{Binding StringFormat='Note: {0}'}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                    <Expander Header="Earlier attempts" IsVisible="{Binding !!History.Count}"
+                              HorizontalAlignment="Stretch">
+                        <ItemsControl ItemsSource="{Binding History, Converter={x:Static dc:UiConverters.NewestFirst}}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Spacing="8" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="runs:StepAttempt">
+                                    <StackPanel Spacing="2">
+                                        <StackPanel Orientation="Horizontal" Spacing="8">
+                                            <TextBlock Classes="meta" Text="{Binding Status, Converter={x:Static dc:UiConverters.Words}}" />
+                                            <TextBlock Classes="meta" Text="{Binding Cause, Converter={x:Static dc:UiConverters.Words}, StringFormat='replaced by {0}'}" />
+                                            <TextBlock Classes="meta" Text="{Binding ReplacedAt, StringFormat='{}{0:g}'}" />
+                                        </StackPanel>
+                                        <TextBlock Classes="meta" TextWrapping="Wrap"
+                                                   Text="{Binding Reason, StringFormat='Reason: {0}'}"
+                                                   IsVisible="{Binding Reason, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        <views:MarkdownView Markdown="{Binding Output, Mode=OneWay}" Title="Earlier attempt"
+                                                            IsVisible="{Binding Output, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        <TextBlock Text="{Binding Answers, Converter={x:Static dc:UiConverters.AnswerLines}}"
+                                                   Classes="meta" TextWrapping="Wrap" IsVisible="{Binding !!Answers.Count}" />
+                                        <TextBlock Text="{Binding AskRounds, Converter={x:Static dc:UiConverters.AskRoundLines}}"
+                                                   Classes="meta" TextWrapping="Wrap" IsVisible="{Binding !!AskRounds.Count}" />
+                                        <TextBlock Text="{Binding AgentChoice, Converter={x:Static dc:UiConverters.AgentChoiceLine}}"
+                                                   Classes="meta" TextWrapping="Wrap"
+                                                   IsVisible="{Binding AgentChoice, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                        <TextBlock Text="{Binding Delegations, Converter={x:Static dc:UiConverters.DelegationLines}}"
+                                                   Classes="meta" TextWrapping="Wrap"
+                                                   IsVisible="{Binding Delegations, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                                        <TextBlock Text="{Binding Error}" Classes="error" Margin="0"
+                                                   IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </Expander>
+                </StackPanel>
+            </Border>
+        </DataTemplate>
+
+        <!-- What the current step waits on the user for: shown above the timeline, or in the graph's popup -->
+        <DataTemplate x:Key="StepActions" x:DataType="dc:RunsPageDataContext">
+            <StackPanel Spacing="8">
+                <WrapPanel ItemSpacing="6" LineSpacing="6">
+                    <ComboBox ItemsSource="{Binding AgentCandidates}" SelectedItem="{Binding PickedAgent}" MinWidth="200"
+                              IsVisible="{Binding CanPickAgent}" PlaceholderText="Pick an agent" />
+                    <Button Classes="accent" Content="Use this agent" Click="OnUseAgent" IsVisible="{Binding CanPickAgent}" />
+                    <Button Classes="accent" Content="Answer" Click="OnAnswer" IsVisible="{Binding CanAnswer}" />
+                    <Button Classes="accent" Content="Approve" Click="OnApprove" IsVisible="{Binding CanApprove}" />
+                    <Button Classes="accent" Content="Use this result" Click="OnChoose" IsVisible="{Binding CanChoose}"
+                            IsEnabled="{Binding SelectedCandidate.CanUse, FallbackValue=False}"
+                            ToolTip.Tip="Use the shown agent's result (with your edits) as the step's output" />
+                    <Button Content="Merge…" Click="OnMerge" IsVisible="{Binding CanChoose}"
+                            ToolTip.Tip="Have an agent merge every result into one" />
+                    <Button Content="Send back…" Click="OnReject" IsVisible="{Binding CanSendBack}" />
+                    <Button Classes="accent" Content="Open terminal" Click="OnOpenTerminal"
+                            IsVisible="{Binding CanOpenTerminal}" />
+                    <Button Content="Mark done…" Click="OnMarkDone" IsVisible="{Binding CanMarkDone}" />
+                    <Button Classes="accent" Content="Retry" Click="OnRetry" IsVisible="{Binding CanRetry}" />
+                </WrapPanel>
+
+                <!-- Each agent's result, for a step several agents did that waits for a choice -->
+                <TabControl ItemsSource="{Binding Candidates}" SelectedItem="{Binding SelectedCandidate}"
+                            IsVisible="{Binding CanChoose}" MaxHeight="360">
+                    <TabControl.Styles>
+                        <Style Selector="TabItem">
+                            <Setter Property="FontSize" Value="14" />
+                            <Setter Property="MinHeight" Value="32" />
+                        </Style>
+                    </TabControl.Styles>
+                    <TabControl.ItemTemplate>
+                        <DataTemplate x:DataType="dc:CandidateDataContext">
+                            <TextBlock Text="{Binding Header}" />
+                        </DataTemplate>
+                    </TabControl.ItemTemplate>
+                    <TabControl.ContentTemplate>
+                        <DataTemplate x:DataType="dc:CandidateDataContext">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="{Binding Error}" Classes="error" Margin="0" TextWrapping="Wrap"
+                                           IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                <TextBox Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="120"
+                                         MaxHeight="280" IsVisible="{Binding CanUse}" />
+                                <TextBlock Classes="meta" Text="Edited: your version is used." IsVisible="{Binding IsEdited}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </TabControl.ContentTemplate>
+                </TabControl>
+
+                <!-- The questions the AI left at the end of its output: answering them sends the step back with the answers -->
+                <Border Classes="step" IsVisible="{Binding ShowQuestions}">
+                    <StackPanel Spacing="10" MaxWidth="720" HorizontalAlignment="Left">
+                        <TextBlock Text="{Binding QuestionsHeading}" FontWeight="SemiBold" />
+                        <TextBlock Classes="meta" TextWrapping="Wrap"
+                                   Text="Answer the ones you can; the AI keeps its assumption for any left blank and redoes the step with your answers." />
+                        <ItemsControl ItemsSource="{Binding Questions}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="dc:OpenQuestionDataContext">
+                                    <StackPanel Spacing="4">
+                                        <SelectableTextBlock Text="{Binding Label}" TextWrapping="Wrap" />
+                                        <TextBox Text="{Binding Answer}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="36"
+                                                 PlaceholderText="Your answer (blank keeps the AI's assumption)" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <TextBox Text="{Binding QuestionsNote}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="36"
+                                 PlaceholderText="Anything else to change (optional)" />
+                        <Button Classes="accent" Content="Send answers" Click="OnSendAnswers" HorizontalAlignment="Left"
+                                ToolTip.Tip="Send the step back with your answers; the AI redoes it with them" />
+                    </StackPanel>
+                </Border>
+
+                <!-- The commands and tools the agent was refused: allow or deny each, and the step carries on -->
+                <Border Classes="step" IsVisible="{Binding CanPermit}">
+                    <StackPanel Spacing="10" MaxWidth="760" HorizontalAlignment="Left">
+                        <TextBlock Text="{Binding PermissionsHeading}" FontWeight="SemiBold" />
+                        <TextBlock Classes="meta" TextWrapping="Wrap"
+                                   Text="Allow once gives the agent the rule for its next turn only. Always allow saves the rule to the run, the repo or every repo. Deny keeps refusing it; the agent is told to carry on without it." />
+                        <ItemsControl ItemsSource="{Binding PermissionRequests}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="dc:PermissionRequestDataContext">
+                                    <StackPanel Spacing="6">
+                                        <SelectableTextBlock Text="{Binding Label}" TextWrapping="Wrap" FontFamily="{StaticResource MonoFont}" />
+                                        <WrapPanel Orientation="Horizontal">
+                                            <ToggleButton Content="Allow once" IsChecked="{Binding IsOnce}" Margin="0,0,6,6" />
+                                            <ToggleButton Content="Always allow" IsChecked="{Binding IsAlways}" Margin="0,0,6,6" />
+                                            <ToggleButton Content="Deny" IsChecked="{Binding IsDenied}" Margin="0,0,6,6" />
+                                        </WrapPanel>
+                                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsDenied}">
+                                            <TextBlock Text="Rule" VerticalAlignment="Center" />
+                                            <AutoCompleteBox Text="{Binding Rule}" ItemsSource="{Binding Rules}" MinWidth="320"
+                                                             FilterMode="None" MinimumPrefixLength="0"
+                                                             ToolTip.Tip="What to allow: pick a suggestion (most specific first) or type your own rule" />
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsAlways}">
+                                            <TextBlock Text="Save to" VerticalAlignment="Center" />
+                                            <ComboBox ItemsSource="{x:Static dc:PermissionRequestDataContext.Scopes}"
+                                                      SelectedItem="{Binding Scope}" MinWidth="100"
+                                                      ToolTip.Tip="Run: this run only. Repo: every run in this repo. Global: every run anywhere." />
+                                        </StackPanel>
+                                        <TextBlock Classes="error" Margin="0" TextWrapping="Wrap" Text="{Binding RuleProblem}"
+                                                   IsVisible="{Binding RuleProblem, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Classes="accent" Content="Continue" Click="OnPermit" IsEnabled="{Binding CanContinuePermit}"
+                                    ToolTip.Tip="Give the agent what you allowed and let it carry on" />
+                            <Button Content="Accept output as is" Click="OnAcceptWithoutPermissions"
+                                    ToolTip.Tip="Take the step's output without allowing anything; the refusals are noted" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- The questions asked now: before the step starts, when the AI asks, or when letting it through -->
+                <Border Classes="step" IsVisible="{Binding ShowInputs}">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="{Binding InputsHeading}" FontWeight="SemiBold" />
+                        <ItemsControl ItemsSource="{Binding Inputs}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="dc:StepInputDataContext">
+                                    <StackPanel Spacing="4" MaxWidth="640" HorizontalAlignment="Left">
+                                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" IsVisible="{Binding !IsToggle}" />
+                                        <TextBlock Text="{Binding Help}" Classes="meta" TextWrapping="Wrap"
+                                                   IsVisible="{Binding Help, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                        <TextBox Text="{Binding Text}" PlaceholderText="{Binding Placeholder}" MinWidth="320"
+                                                 IsVisible="{Binding IsText}" />
+                                        <TextBox Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80"
+                                                 MinWidth="320" IsVisible="{Binding IsMultiline}" />
+                                        <ComboBox ItemsSource="{Binding Options}" SelectedItem="{Binding Choice}" MinWidth="240"
+                                                  PlaceholderText="Pick one" IsVisible="{Binding IsChoice}" />
+                                        <ItemsControl ItemsSource="{Binding Choices}" IsVisible="{Binding IsMultiChoice}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><WrapPanel ItemSpacing="16" /></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="{x:Type dc:SelectableItem, x:TypeArguments=x:String}">
+                                                    <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <CheckBox Content="{Binding Label}" IsChecked="{Binding IsChecked}" IsVisible="{Binding IsToggle}" />
+                                        <TextBlock Text="{Binding Error}" Classes="error" Margin="0" TextWrapping="Wrap"
+                                                   IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    </StackPanel>
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </DataTemplate>
+    </niddy:Page.Resources>
+
+    <Grid ColumnDefinitions="340,*" RowDefinitions="Auto,*">
+
+        <TextBlock Grid.Row="0" Grid.ColumnSpan="2" Classes="error" Text="{Binding ErrorMessage}"
+                   IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+        <!-- Runs in their folders, with the child and path runs folded under the run that started them -->
+        <DockPanel Grid.Row="1" Grid.Column="0" Margin="0,0,6,0">
+            <DockPanel DockPanel.Dock="Top">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <Button Content="Rename folder…" Click="OnRenameFolder" Padding="8,2" FontSize="12"
+                            IsVisible="{Binding CanEditFolder}" ToolTip.Tip="Rename or move the folder, with what's in it" />
+                    <Button Content="Remove folder…" Click="OnRemoveFolder" Padding="8,2" FontSize="12"
+                            IsVisible="{Binding CanEditFolder}" ToolTip.Tip="Remove the folder; what's in it moves up a level" />
+                    <Button Content="New folder…" Click="OnCreateFolder" Padding="8,2" FontSize="12"
+                            IsVisible="{Binding CanCreateFolder}"
+                            ToolTip.Tip="Create a folder to file runs in (inside the selected folder, if one is selected)" />
+                </StackPanel>
+                <TextBlock Classes="h2" Text="Runs" />
+            </DockPanel>
+            <views:RunFilterView DockPanel.Dock="Top" DataContext="{Binding Filter}" Margin="0,0,0,6" />
+            <views:TagFilterView DockPanel.Dock="Top" DataContext="{Binding TagFilter}" Margin="0,0,0,6" />
+            <Button DockPanel.Dock="Top" Content="Clear filters" Click="OnClearFilters" Margin="0,0,0,6" Padding="8,2" FontSize="12"
+                    IsVisible="{Binding IsFiltered}" ToolTip.Tip="Empty the search and unpick every state and tag" />
+            <Panel>
+                <TextBlock Text="{Binding EmptyMessage}" Classes="hint"
+                           IsVisible="{Binding EmptyMessage, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                <ListBox x:Name="RowList" ItemsSource="{Binding Rows}" SelectedItem="{Binding SelectedRow}" views:RowMenus.IsEnabled="True">
+                    <ListBox.DataTemplates>
+                        <DataTemplate DataType="dc:FolderRowDataContext">
+                            <DockPanel Margin="{Binding Indent}">
+                                <DockPanel.ContextMenu>
+                                    <!-- Given the page's DataContext as it opens (views:RowMenus), with the folder selected -->
+                                    <ContextMenu x:DataType="dc:RunsPageDataContext" Opened="OnRowMenuOpened" Closed="OnRowMenuClosed">
+                                        <MenuItem Header="New folder inside…" Click="OnCreateFolder" IsVisible="{Binding CanCreateFolder}" />
+                                        <MenuItem Header="Rename folder…" Click="OnRenameFolder" IsVisible="{Binding CanEditFolder}" />
+                                        <Separator IsVisible="{Binding CanEditFolder}" />
+                                        <MenuItem Header="Remove folder…" Click="OnRemoveFolder" IsVisible="{Binding CanEditFolder}" />
+                                    </ContextMenu>
+                                </DockPanel.ContextMenu>
+                                <Panel DockPanel.Dock="Left" Width="20" Margin="0,0,4,0" VerticalAlignment="Top">
+                                    <Button Classes="toggle" Classes.expanded="{Binding IsExpanded}" Click="OnToggleRow"
+                                            Padding="0" Width="20" Height="20" IsVisible="{Binding HasChildren}"
+                                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                            ToolTip.Tip="Open or close the folder">
+                                        <Path Data="M 0,0 L 4,4 L 0,8" Stroke="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                              StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" />
+                                    </Button>
+                                </Panel>
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name, StringFormat='▤  {0}'}" FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis" ToolTip.Tip="{Binding Folder}" />
+                                    <DockPanel>
+                                        <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding StateCounts}" Margin="6,0,0,0">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="dc:RunStateCount">
+                                                    <TextBlock Classes="state" FontSize="11" Text="{Binding Text}" ToolTip.Tip="{Binding Tip}"
+                                                               Foreground="{Binding Info.State, Converter={x:Static dc:UiConverters.StateBrush}}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Classes="meta" Text="{Binding Summary}" TextTrimming="CharacterEllipsis"
+                                                   Classes.waiting="{Binding HasWaitingChildren}" />
+                                    </DockPanel>
+                                </StackPanel>
+                            </DockPanel>
+                        </DataTemplate>
+                        <DataTemplate DataType="dc:RunRowDataContext">
+                            <DockPanel Margin="{Binding Indent}">
+                                <DockPanel.ContextMenu>
+                                    <!-- Given the page's DataContext as it opens (views:RowMenus), with the run selected -->
+                                    <ContextMenu x:DataType="dc:RunsPageDataContext" Opening="OnRunMenuOpening" Opened="OnRowMenuOpened"
+                                                 Closed="OnRowMenuClosed">
+                                        <MenuItem Header="Open step" Click="OnOpenStep" IsVisible="{Binding CanOpenStep}" />
+                                        <MenuItem Header="Resume" Click="OnResume" IsVisible="{Binding CanResume}" />
+                                        <MenuItem Header="Stop" Click="OnStop" IsVisible="{Binding CanStop}" />
+                                        <Separator IsVisible="{Binding CanOpenStep}" />
+                                        <MenuItem Header="Add note…" Click="OnAddNote" IsVisible="{Binding CanAddNote}" />
+                                        <MenuItem Header="Rename…" Click="OnRename" IsVisible="{Binding CanLabel}" />
+                                        <MenuItem Header="Tags" IsVisible="{Binding CanLabel}" Click="OnPickTag"
+                                                  ItemsSource="{Binding RunTagChoices}" ItemContainerTheme="{StaticResource ChoiceMenuItem}" />
+                                        <MenuItem Header="Move to" IsVisible="{Binding CanMoveToFolder}" Click="OnPickFolder"
+                                                  ItemsSource="{Binding RunFolderChoices}" ItemContainerTheme="{StaticResource ChoiceMenuItem}" />
+                                        <MenuItem Header="Copy run id" Click="OnCopyRunId" IsVisible="{Binding CanLabel}" />
+                                        <Separator IsVisible="{Binding CanDelete}" />
+                                        <MenuItem Header="Cancel run…" Click="OnCancel" IsVisible="{Binding CanCancel}" />
+                                        <MenuItem Header="Delete run…" Click="OnDelete" IsVisible="{Binding CanDelete}" />
+                                    </ContextMenu>
+                                </DockPanel.ContextMenu>
+                                <Panel DockPanel.Dock="Left" Width="20" Margin="0,0,4,0" VerticalAlignment="Top">
+                                    <Button Classes="toggle" Classes.expanded="{Binding IsExpanded}" Click="OnToggleRow"
+                                            Padding="0" Width="20" Height="20" IsVisible="{Binding HasChildren}"
+                                            HorizontalContentAlignment="Center" VerticalContentAlignment="Center"
+                                            ToolTip.Tip="Show or hide the runs this one started">
+                                        <Path Data="M 0,0 L 4,4 L 0,8" Stroke="{DynamicResource SystemControlForegroundBaseMediumBrush}"
+                                              StrokeThickness="1.5" StrokeLineCap="Round" StrokeJoin="Round" />
+                                    </Button>
+                                </Panel>
+                                <StackPanel>
+                                    <DockPanel>
+                                        <TextBlock DockPanel.Dock="Right" Classes="needs" Text="needs you" IsVisible="{Binding NeedsYou}"
+                                                   VerticalAlignment="Center" Margin="6,0,0,0" />
+                                        <TextBlock DockPanel.Dock="Left" Classes="state" Text="{Binding State.Symbol}" Width="16"
+                                                   Foreground="{Binding Run.State, Converter={x:Static dc:UiConverters.StateBrush}}"
+                                                   ToolTip.Tip="{Binding State.Description}" />
+                                        <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                                    </DockPanel>
+                                    <TextBlock Classes="meta">
+                                        <TextBlock.Text>
+                                            <MultiBinding Converter="{x:Static dc:UiConverters.MetaLine}">
+                                                <Binding Path="Run.Ticket.Key" />
+                                                <Binding Path="Run.RepoName" />
+                                                <Binding Path="Run.Workflow.Name" />
+                                            </MultiBinding>
+                                        </TextBlock.Text>
+                                    </TextBlock>
+                                    <TextBlock Classes="meta" Text="{Binding TagsText}" TextTrimming="CharacterEllipsis"
+                                               IsVisible="{Binding TagsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                                    <DockPanel IsVisible="{Binding Summary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                        <ItemsControl DockPanel.Dock="Right" ItemsSource="{Binding StateCounts}" Margin="6,0,0,0"
+                                                      IsVisible="{Binding !IsExpanded}">
+                                            <ItemsControl.ItemsPanel>
+                                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="6" /></ItemsPanelTemplate>
+                                            </ItemsControl.ItemsPanel>
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate x:DataType="dc:RunStateCount">
+                                                    <TextBlock Classes="state" FontSize="11" Text="{Binding Text}" ToolTip.Tip="{Binding Tip}"
+                                                               Foreground="{Binding Info.State, Converter={x:Static dc:UiConverters.StateBrush}}" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                        <TextBlock Classes="meta" Text="{Binding Summary}" TextTrimming="CharacterEllipsis"
+                                                   Classes.waiting="{Binding HasWaitingChildren}" />
+                                    </DockPanel>
+                                </StackPanel>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ListBox.DataTemplates>
+                </ListBox>
+            </Panel>
+        </DockPanel>
+
+        <!-- Selected run -->
+        <Border Grid.Row="1" Grid.Column="1" Margin="6,0,0,0" Classes="card">
+            <Panel>
+                <TextBlock Text="Select a run" Classes="hint" HorizontalAlignment="Center" VerticalAlignment="Center"
+                           IsVisible="{Binding SelectedRun, Converter={x:Static ObjectConverters.IsNull}}" />
+                <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,200"
+                      IsVisible="{Binding SelectedRun, Converter={x:Static ObjectConverters.IsNotNull}}">
+
+                    <SelectableTextBlock Grid.Row="0" Text="{Binding SelectedRun.DisplayTitle}" Classes="h1" />
+                    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,2,0,8">
+                        <TextBlock Classes="meta">
+                            <TextBlock.Text>
+                                <MultiBinding Converter="{x:Static dc:UiConverters.MetaLine}">
+                                    <Binding Path="SelectedRun.Ticket.Key" />
+                                    <Binding Path="SelectedRun.RepoName" />
+                                    <Binding Path="SelectedRun.Id" StringFormat="run {0}" />
+                                </MultiBinding>
+                            </TextBlock.Text>
+                        </TextBlock>
+                        <TextBlock Classes="meta" FontWeight="SemiBold" Opacity="1"
+                                   Text="{Binding SelectedRun.State, Converter={x:Static dc:UiConverters.StateText}}"
+                                   Foreground="{Binding SelectedRun.State, Converter={x:Static dc:UiConverters.StateBrush}}"
+                                   ToolTip.Tip="{Binding SelectedRun.State, Converter={x:Static dc:UiConverters.StateDescription}}" />
+                        <TextBlock Classes="meta" Text="{Binding SelectedRun.Folder, StringFormat='in {0}'}"
+                                   IsVisible="{Binding SelectedRun.Folder, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <ItemsControl ItemsSource="{Binding SelectedRun.Tags}" VerticalAlignment="Center">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="x:String">
+                                    <Button Classes="tag" Content="{Binding}" Click="OnFilterTag"
+                                            ToolTip.Tip="Only list the runs with this tag" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                        <HyperlinkButton Content="Open ticket" NavigateUri="{Binding SelectedRun.Ticket.Url}" Padding="0"
+                                         FontSize="12" />
+                        <TextBlock Classes="meta" Text="{Binding ModeText}"
+                                   ToolTip.Tip="Background: agents' commands run out of sight. Terminal: each runs in a terminal window you can watch." />
+                        <TextBlock Classes="meta" Text="{Binding SkillsText}" TextTrimming="CharacterEllipsis" MaxWidth="360"
+                                   ToolTip.Tip="The skills picked for this run when it was started, in place of its workflow's own"
+                                   IsVisible="{Binding SkillsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <TextBlock Classes="meta" Text="{Binding PathText}" TextTrimming="CharacterEllipsis"
+                                   IsVisible="{Binding PathText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                    </StackPanel>
+                    <!-- What the run is waiting for, and the actions it allows -->
+                    <StackPanel Grid.Row="2" Spacing="8" Margin="0,0,0,8">
+                        <StackPanel Orientation="Horizontal" Spacing="8"
+                                    IsVisible="{Binding ParentText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                            <TextBlock Classes="meta" VerticalAlignment="Center" Text="{Binding ParentText}" />
+                            <HyperlinkButton Content="Open it" Padding="0" FontSize="12" Click="OnOpenParent"
+                                             ToolTip.Tip="Select the run that started this one" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding Hint}" TextWrapping="Wrap" FontWeight="SemiBold" IsVisible="{Binding ShowsInlineHint}" />
+                        <TextBlock Classes="meta" Text="{Binding PathStepsText}" TextWrapping="Wrap"
+                                   IsVisible="{Binding PathStepsText, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <ContentControl Content="{Binding}" ContentTemplate="{StaticResource StepActions}"
+                                        IsVisible="{Binding ShowsInlineStepActions}" />
+                        <WrapPanel ItemSpacing="6" LineSpacing="6">
+                            <Button Classes="accent" Content="Open step" Click="OnOpenStep" IsVisible="{Binding CanOpenStep}"
+                                    ToolTip.Tip="Show the step the run is on, and what it needs from you" />
+
+                            <Button Classes="accent" Content="Resume" Click="OnResume" IsVisible="{Binding CanResume}" />
+                            <Button Content="Stop" Click="OnStop" IsVisible="{Binding CanStop}" />
+                            <Button Content="Add note…" Click="OnAddNote" IsVisible="{Binding CanAddNote}" />
+                            <Button Content="Rename…" Click="OnRename" IsVisible="{Binding CanLabel}"
+                                    ToolTip.Tip="Give the run a name of its own (the ticket keeps its title)" />
+                            <Button Content="Tags…" Click="OnEditTags" IsVisible="{Binding CanLabel}" />
+                            <Button Content="Move to folder…" Click="OnMoveToFolder" IsVisible="{Binding CanMoveToFolder}" />
+                            <Button Content="Cancel run…" Click="OnCancel" IsVisible="{Binding CanCancel}" />
+                            <Button Content="Delete run…" Click="OnDelete" IsVisible="{Binding CanDelete}"
+                                    ToolTip.Tip="Delete the run, its step logs and the child runs it started" />
+                        </WrapPanel>
+                    </StackPanel>
+
+                    <!-- The run on its workflow's graph (steps open in a popup), or every step in a timeline -->
+                    <TabControl Grid.Row="3" SelectedIndex="{Binding SelectedTab}" Padding="0,6,0,0">
+                    <TabItem Header="Graph" FontSize="15" MinHeight="32" Padding="10,2">
+                        <Panel>
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Top" Classes="meta" Margin="0,0,0,6" Text="{Binding Graph.OverlaySummary}"
+                                           TextTrimming="CharacterEllipsis" />
+                                <views:FlowEditorView x:Name="RunGraph" DataContext="{Binding Graph}" />
+                            </DockPanel>
+
+                            <!-- The clicked step, or the one waiting on the user, with what it needs -->
+                            <Border x:Name="StepPopup" Classes="card popup" IsVisible="{Binding IsPopupOpen}"
+                                    HorizontalAlignment="Right" VerticalAlignment="Top" Width="480" Margin="0,28,8,8">
+                                <DockPanel>
+                                    <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
+                                        <Button DockPanel.Dock="Right" Content="✕" Click="OnClosePopup" Padding="8,2"
+                                                ToolTip.Tip="Close (it opens again when something new waits on you)" />
+                                        <HyperlinkButton DockPanel.Dock="Right" Content="Show in timeline" Click="OnShowInTimeline"
+                                                         Padding="0" FontSize="12" VerticalAlignment="Center" Margin="0,0,10,0" />
+                                        <TextBlock Classes="h2" Text="{Binding PopupHeading}" VerticalAlignment="Center" Margin="0" />
+                                    </DockPanel>
+                                    <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,8">
+                                        <TextBlock Text="{Binding Hint}" TextWrapping="Wrap" FontWeight="SemiBold"
+                                                   IsVisible="{Binding PopupIsCurrent}" />
+                                        <DockPanel IsVisible="{Binding PopupPathRunId, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                                            <Button DockPanel.Dock="Right" Classes="accent" Content="Open path run" Click="OnOpenChild"
+                                                    Tag="{Binding PopupPathRunId}" Margin="8,0,0,0" />
+                                            <TextBlock Classes="meta" Text="{Binding PopupPathText}" TextWrapping="Wrap"
+                                                       VerticalAlignment="Center" />
+                                        </DockPanel>
+                                    </StackPanel>
+                                    <ScrollViewer>
+                                        <StackPanel Spacing="8">
+                                            <ContentControl Content="{Binding}" ContentTemplate="{StaticResource StepActions}"
+                                                            IsVisible="{Binding PopupIsCurrent}" />
+                                            <ContentControl Content="{Binding PopupStep}" ContentTemplate="{StaticResource StepCard}" />
+                                        </StackPanel>
+                                    </ScrollViewer>
+                                </DockPanel>
+                            </Border>
+                        </Panel>
+                    </TabItem>
+                    <TabItem Header="Timeline" FontSize="15" MinHeight="32" Padding="10,2">
+                    <ScrollViewer x:Name="TimelineScroller">
+                        <ItemsControl x:Name="Timeline" ItemsSource="{Binding SelectedRun.Steps}"
+                                      ItemTemplate="{StaticResource StepCard}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Spacing="6" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                    </ScrollViewer>
+                    </TabItem>
+                    </TabControl>
+
+                    <!-- Live output -->
+                    <TextBlock Grid.Row="4" Classes="h2" Text="Live output" Margin="0,10,0,4" />
+                    <Border Grid.Row="5" Classes="console">
+                        <Panel>
+                            <TextBlock Classes="hint" Text="Output from runs driven by this window appears here."
+                                       IsVisible="{Binding Live, Converter={x:Static ObjectConverters.IsNull}}" />
+                            <ScrollViewer x:Name="OutputScroller">
+                                <SelectableTextBlock Text="{Binding Live.Output}" FontFamily="{StaticResource MonoFont}"
+                                                     FontSize="12" TextWrapping="Wrap" />
+                            </ScrollViewer>
+                        </Panel>
+                    </Border>
+                </Grid>
+            </Panel>
+        </Border>
+    </Grid>
+</niddy:Page>
