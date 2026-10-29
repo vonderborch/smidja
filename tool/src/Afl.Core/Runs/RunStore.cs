@@ -58,13 +58,18 @@ public class RunStore(AflPaths paths) : AbstractJsonCollectionStore<Run, string>
     }
 
     /// <summary>
-    ///     Lists runs, newest first.
+    ///     Lists runs, newest first. Authoring runs (<see cref="RunKind.Authoring" />) belong to the AI authoring helper,
+    ///     so they are left out unless asked for.
     /// </summary>
     /// <param name="repoId">Only runs in this repo, or null for every repo.</param>
+    /// <param name="includeAuthoring">Whether to include authoring runs.</param>
     /// <returns>The runs.</returns>
-    public IReadOnlyList<Run> List(string? repoId = null)
+    public IReadOnlyList<Run> List(string? repoId = null, bool includeAuthoring = false)
     {
-        return this.All().Where(r => repoId is null || r.RepoId == repoId).OrderByDescending(r => r.CreatedAt).ToList();
+        return this.All()
+            .Where(r => (repoId is null || r.RepoId == repoId) && (includeAuthoring || !r.IsAuthoring))
+            .OrderByDescending(r => r.CreatedAt)
+            .ToList();
     }
 
     /// <summary>

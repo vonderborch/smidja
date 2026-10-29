@@ -171,6 +171,11 @@ afl step new <id> --from-workflow hotfix --step review [--in-repo]   # save a wo
 afl skill list|show <id>|validate <file>|new <id> [--in-repo]|delete <id> [--in-repo]   # common skills, e.g. caveman
 afl skill import <SKILL.md or folder> [--in-repo] | export <id> <dir>
 afl skill recommend [--workflow feature-flow] [--language python] [--framework fastapi] [--clear-stack]   # skills that suit this repo
+afl author-new skill|step|workflow --describe "a skill for conventional commit messages" [--repo id] [--agent claude]   # an AI drafts it for you to review
+afl author-improve skill caveman [--describe "also cover code comments"]   # an AI improves one; a built-in is saved as a copy
+afl author-list [--kind skill] | author-show <draft>  # AI drafts: where each is, its questions, permission requests and problems
+afl author-answer <draft> --input style="Conventional Commits" | author-permit <draft> --once 1 | author-resume <draft>
+afl author-changes <draft> --feedback "..." | author-approve <draft> --scope global|repo [--overwrite] | author-discard <draft>
 afl workflow list --tag review --tag security        # workflow, step and skill lists: only ones with every tag given
 afl step list --search "deserialization" [--names-only] [--scope builtin|global|repo]   # words in the name or contents
 afl repo [list|add <path>|remove <repo>|set --default-workflow <id>]
@@ -292,6 +297,12 @@ between has the pages:
   skills AI steps are given (saved to `skills/`). Leaving any of the three pages with unsaved edits asks first. Each
   page's list can be searched by name or contents, and filtered by tags and scope; a draft's tags are edited beside its
   description.
+- **New with AI…** / **Improve with AI…** (on all three pages): describe what you want and an agent drafts it. It may
+  search the web, asks before reading each new site (the usual permission prompt), may ask you questions, and can read
+  the selected repo but not change it; it works in its own folder (`~/.afl/authoring/<id>`). The draft opens beside
+  the list with a review card: the agent's summary, any problems (Approve waits until there are none), the JSON, and
+  **Approve** (to global or this repo), **Request changes**, **Open in editor** (Save then approves it) or
+  **Discard…**. Drafts in progress are listed under **AI drafts**; their runs never show on the Runs page.
 - **Repo settings** (the gear): the repo's name, path and default workflow, **Remove repo…**, the GitHub or GitLab
   project its issues come from (pick a site and project, or **Detect from remotes**), and its Jira link. Linking an instance lists its projects and boards: tick the projects that belong to the repo, and pick a
   project, board and assignee (`me`, `unassigned`) for saved filters. If Jira can't be reached, type project keys and
@@ -323,6 +334,8 @@ The UI watches `~/.afl`, so runs the CLI or `/afl` changes show up on their own.
   `workflows/steps/`.
 - **New common skill** (instructions afl gives a step's agent, e.g. `caveman`): the UI's Skills page,
   `afl skill new`, or `afl skill import` an existing `SKILL.md`. Built-ins live in `workflows/skills/`.
+- **Any of those three, written by an AI**: **New with AI…** on its page, or `afl author-new <kind> --describe "..."`.
+  Nothing is saved until you approve the draft.
 - **New UI page**: an `AbstractAflPage<TDataContext>` with `[PageRegistration]` (give it a `SortKey` to place it in
   the menu, or `TopLevel = false` to open it only from code) and `[PageIcon]`, and an `AbstractPageDataContext`. The Niddy generator registers it and the sidebar menu
   picks it up.
@@ -346,3 +359,18 @@ To save a screenshot of each UI page (rendered headlessly over sample data), set
 ```bash
 cd tool && AFL_UI_SCREENSHOTS=/tmp/afl-shots dotnet test tests/Afl.UI.Tests
 ```
+
+### CI and releases
+
+GitHub Actions (`.github/workflows/`):
+
+- **Build** (`build.yml`) runs on pushes and pull requests to `main`. It builds on Windows, Linux and macOS, and runs
+  the tests on Linux and macOS. Many tests drive fake agents through shell scripts, so Windows only builds.
+- **Release** (`release.yml`) runs when a GitHub release is published. The release's tag is the version (`1.0.0` or
+  `v1.0.0`). It runs Build, then publishes self-contained packages for `win-x64`, `win-arm64`, `linux-x64`,
+  `linux-arm64`, `osx-arm64` and `osx-x64`, and attaches them to the release:
+  - `afl-cli-<version>-<rid>`: the `afl` command as a single file;
+  - `afl-ui-<version>-<rid>`: the desktop app;
+  - `Afl.Cli.<version>.nupkg`: the dotnet tool.
+
+  The archives are `.zip` on Windows and `.tar.gz` elsewhere.

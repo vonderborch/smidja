@@ -2,6 +2,8 @@ using Afl.Cli.Output;
 using Afl.Core.Exceptions;
 using Afl.Core.Helpers;
 using Afl.Core.Repos;
+using Afl.Core.Runs;
+using Afl.Core.Steps;
 using Afl.Core.Tickets;
 using CommandLine;
 
@@ -164,6 +166,33 @@ public abstract class AbstractCommand
         }
 
         return choice.Repo;
+    }
+
+    /// <summary>
+    ///     Asks the user, in a terminal, for the current step's inputs that weren't given on the command line. Without
+    ///     a terminal the given answers are returned as they are, and the engine reports any that are missing.
+    /// </summary>
+    /// <param name="run">The run.</param>
+    /// <param name="given">The answers given already, by input id.</param>
+    /// <returns>The answers, by input id.</returns>
+    protected Dictionary<string, string> AskForAnswers(Run run, IReadOnlyDictionary<string, string> given)
+    {
+        var answers = new Dictionary<string, string>(given);
+        if (run.IsFinished || run.CurrentStep is not { } state)
+        {
+            return answers;
+        }
+
+        foreach (var input in StepHandlerRegistry.Instance.For(run.DefinitionOf(state)).InputsAskedNow(run, state))
+        {
+            if (!answers.ContainsKey(input.Id) && StepInputTypeRegistry.Instance.Contains(input.Type)
+                && this.Output.AskInput(input, StepInputTypeRegistry.Instance.For(input)) is { } answer)
+            {
+                answers[input.Id] = answer;
+            }
+        }
+
+        return answers;
     }
 
     /// <summary>

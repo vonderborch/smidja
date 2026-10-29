@@ -162,6 +162,12 @@ public enum RunKind
     ///     workflow (<see cref="Run.StopAfterStep" />), which the parent then routes, and is folded under the parent.
     /// </summary>
     Path,
+
+    /// <summary>
+    ///     A run of the AI authoring helper, drafting a skill, common step or workflow (see
+    ///     <see cref="Authoring.AuthoringService" />). It is left out of run lists and the Runs page.
+    /// </summary>
+    Authoring,
 }
 
 /// <summary>
@@ -398,6 +404,12 @@ public class Run : AbstractVersionedDocument
     public bool IsPathRun => this.Kind == RunKind.Path;
 
     /// <summary>
+    ///     Gets whether this is an authoring run, drafting a document for the AI authoring helper.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsAuthoring => this.Kind == RunKind.Authoring;
+
+    /// <summary>
     ///     Gets, for a path run, the step it runs: the one it visited, or the one it's on before it starts.
     /// </summary>
     [JsonIgnore]
@@ -629,6 +641,12 @@ public class RunStep
     public int PermissionRounds { get; set; }
 
     /// <summary>
+    ///     Gets or sets how many times, in this attempt, the step's output was checked, found wanting and sent back to
+    ///     the AI to fix (an <c>author-draft</c> step's draft, for example).
+    /// </summary>
+    public int CheckRounds { get; set; }
+
+    /// <summary>
     ///     Gets or sets the rules the user allowed once, for the AI's next turn only.
     /// </summary>
     public List<string> OnceRules { get; set; } = [];
@@ -739,6 +757,7 @@ public class RunStep
         this.Delegations = [];
         this.PermissionRequests = [];
         this.PermissionRounds = 0;
+        this.CheckRounds = 0;
         this.OnceRules = [];
         this.CreatedTickets = [];
         this.ChildRuns = [];

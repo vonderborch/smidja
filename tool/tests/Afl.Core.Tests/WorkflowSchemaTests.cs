@@ -50,7 +50,7 @@ public class WorkflowSchemaTests
     {
         // A step reads as its type's subclass, so the schema's one step definition has every subclass's fields.
         var types = type == typeof(AbstractStepDefinition)
-            ? StepHandlerRegistry.Instance.Keys.Select(StepHandlerRegistry.Instance.DefinitionTypeOf)
+            ? StepHandlerRegistry.Instance.PublicKeys.Select(StepHandlerRegistry.Instance.DefinitionTypeOf)
             : [type];
         var expected = types.SelectMany(t => Options.GetTypeInfo(t).Properties).Where(p => p.Get is not null && !p.IsExtensionData).Select(p => p.Name)
             .Distinct().Order();
@@ -70,7 +70,7 @@ public class WorkflowSchemaTests
     [Fact]
     public void Schema_ListsEveryRegisteredKindAndValue()
     {
-        AssertEnum(StepHandlerRegistry.Instance.Keys, "step", "type");
+        AssertEnum(StepHandlerRegistry.Instance.PublicKeys, "step", "type");
         AssertEnum(StepInputTypeRegistry.Instance.Keys, "input", "type");
         AssertEnum(ConditionRegistry.Instance.Keys, "condition", "kind");
         AssertEnum(CombineStrategyRegistry.Instance.Keys, "step", "combine");

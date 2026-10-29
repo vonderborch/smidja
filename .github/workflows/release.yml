@@ -1,0 +1,121 @@
+# Builds release packages of the afl tool when a GitHub release is published, and attaches them to it.
+# The release's tag is the version: 1.0.0 or v1.0.0 (a pre-release suffix such as 1.0.0-beta.1 also works).
+#
+# Attached to the release:
+#   afl-cli-<version>-<rid>.(zip|tar.gz)  the afl command, one self-contained file
+#   afl-ui-<version>-<rid>.(zip|tar.gz)   the desktop app, self-contained
+#   Afl.Cli.<version>.nupkg               the dotnet tool (dotnet tool install -g Afl.Cli --add-source <folder>)
+name: Release
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  version:
+    name: Read the version
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - id: version
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: |
+          version="${TAG#v}"
+          if [[ ! "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::The release tag '$TAG' isn't a version like 1.0.0 or v1.0.0."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build and test
+    needs: version
+    uses: ./.github/workflows/build.yml
+
+  package:
+    name: Package (${{ matrix.rid }})
+    needs: [version, build]
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows-latest, rid: win-x64 }
+          - { os: windows-latest, rid: win-arm64 }
+          - { os: ubuntu-latest, rid: linux-x64 }
+          - { os: ubuntu-24.04-arm, rid: linux-arm64 }
+          - { os: macos-latest, rid: osx-arm64 }
+          - { os: macos-latest, rid: osx-x64 }
+    runs-on: ${{ matrix.os }}
+    env:
+      VERSION: ${{ needs.version.outputs.version }}
+      RID: ${{ matrix.rid }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Publish the CLI
+        shell: bash
+        run: >
+          dotnet publish tool/src/Afl.Cli -c Release -r "$RID" --self-contained
+          -p:Version="$VERSION" -p:DebugType=None -p:GenerateDocumentationFile=false -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true
+          -o "out/afl-cli-$VERSION-$RID"
+
+      - name: Publish the desktop app
+        shell: bash
+        run: >
+          dotnet publish tool/src/Afl.UI -c Release -r "$RID" --self-contained
+          -p:Version="$VERSION" -p:DebugType=None -p:GenerateDocumentationFile=false -o "out/afl-ui-$VERSION-$RID"
+
+      - name: Archive
+        shell: bash
+        working-directory: out
+        run: |
+          mkdir -p ../dist
+          for dir in afl-cli-$VERSION-$RID afl-ui-$VERSION-$RID; do
+            if [[ "$RUNNER_OS" == "Windows" ]]; then
+              7z a -tzip "../dist/$dir.zip" "./$dir/*" > /dev/null
+            else
+              tar -czf "../dist/$dir.tar.gz" -C "$dir" .
+            fi
+          done
+
+      - name: Pack the dotnet tool
+        if: matrix.rid == 'linux-x64'
+        run: dotnet pack tool/src/Afl.Cli -c Release -p:Version="$VERSION" -o dist
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: afl-${{ matrix.rid }}
+          path: dist/*
+          if-no-files-found: error
+
+  upload:
+    name: Attach to the release
+    needs: package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          pattern: afl-*
+          merge-multiple: true
+
+      - name: Upload
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" dist/* --clobber --repo "$GITHUB_REPOSITORY"

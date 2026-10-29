@@ -49,7 +49,20 @@ public partial class WorkflowLibrary(AflPaths paths, string? repoPath = null)
     /// <returns>The problems; empty when it is valid.</returns>
     public override IReadOnlyList<string> ValidateForSave(WorkflowDefinition document)
     {
-        return new WorkflowComposer(this).Validate(document);
+        return InternalStepProblems(document).Concat(new WorkflowComposer(this).Validate(document)).ToList();
+    }
+
+    /// <summary>
+    ///     Checks that a workflow people wrote uses none of afl's internal step types
+    ///     (<see cref="AbstractStepHandler.IsInternal" />), which only workflows afl builds itself may use.
+    /// </summary>
+    /// <param name="workflow">The workflow.</param>
+    /// <returns>The problems; empty when it uses none.</returns>
+    public static IEnumerable<string> InternalStepProblems(WorkflowDefinition workflow)
+    {
+        return workflow.Steps
+            .Where(s => StepHandlerRegistry.Instance.IsInternal(s.Type))
+            .Select(s => $"Step '{s.Id}': type '{s.Type}' is internal to afl. Use one of {string.Join(", ", StepHandlerRegistry.Instance.PublicKeys)}.");
     }
 
     /// <summary>

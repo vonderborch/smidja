@@ -270,36 +270,10 @@
                         <TextBlock Text="{Binding PermissionsHeading}" FontWeight="SemiBold" />
                         <TextBlock Classes="meta" TextWrapping="Wrap"
                                    Text="Allow once gives the agent the rule for its next turn only. Always allow saves the rule to the run, the repo or every repo. Deny keeps refusing it; the agent is told to carry on without it." />
-                        <ItemsControl ItemsSource="{Binding PermissionRequests}">
+                        <ItemsControl ItemsSource="{Binding PermissionRequests}" ItemTemplate="{StaticResource PermissionRequestRow}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="dc:PermissionRequestDataContext">
-                                    <StackPanel Spacing="6">
-                                        <SelectableTextBlock Text="{Binding Label}" TextWrapping="Wrap" FontFamily="{StaticResource MonoFont}" />
-                                        <WrapPanel Orientation="Horizontal">
-                                            <ToggleButton Content="Allow once" IsChecked="{Binding IsOnce}" Margin="0,0,6,6" />
-                                            <ToggleButton Content="Always allow" IsChecked="{Binding IsAlways}" Margin="0,0,6,6" />
-                                            <ToggleButton Content="Deny" IsChecked="{Binding IsDenied}" Margin="0,0,6,6" />
-                                        </WrapPanel>
-                                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding !IsDenied}">
-                                            <TextBlock Text="Rule" VerticalAlignment="Center" />
-                                            <AutoCompleteBox Text="{Binding Rule}" ItemsSource="{Binding Rules}" MinWidth="320"
-                                                             FilterMode="None" MinimumPrefixLength="0"
-                                                             ToolTip.Tip="What to allow: pick a suggestion (most specific first) or type your own rule" />
-                                        </StackPanel>
-                                        <StackPanel Orientation="Horizontal" Spacing="8" IsVisible="{Binding IsAlways}">
-                                            <TextBlock Text="Save to" VerticalAlignment="Center" />
-                                            <ComboBox ItemsSource="{x:Static dc:PermissionRequestDataContext.Scopes}"
-                                                      SelectedItem="{Binding Scope}" MinWidth="100"
-                                                      ToolTip.Tip="Run: this run only. Repo: every run in this repo. Global: every run anywhere." />
-                                        </StackPanel>
-                                        <TextBlock Classes="error" Margin="0" TextWrapping="Wrap" Text="{Binding RuleProblem}"
-                                                   IsVisible="{Binding RuleProblem, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
                         </ItemsControl>
                         <StackPanel Orientation="Horizontal" Spacing="8">
                             <Button Classes="accent" Content="Continue" Click="OnPermit" IsEnabled="{Binding CanContinuePermit}"
@@ -314,38 +288,10 @@
                 <Border Classes="step" IsVisible="{Binding ShowInputs}">
                     <StackPanel Spacing="10">
                         <TextBlock Text="{Binding InputsHeading}" FontWeight="SemiBold" />
-                        <ItemsControl ItemsSource="{Binding Inputs}">
+                        <ItemsControl ItemsSource="{Binding Inputs}" ItemTemplate="{StaticResource StepInputRow}">
                             <ItemsControl.ItemsPanel>
                                 <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
                             </ItemsControl.ItemsPanel>
-                            <ItemsControl.ItemTemplate>
-                                <DataTemplate x:DataType="dc:StepInputDataContext">
-                                    <StackPanel Spacing="4" MaxWidth="640" HorizontalAlignment="Left">
-                                        <TextBlock Text="{Binding Label}" FontWeight="SemiBold" IsVisible="{Binding !IsToggle}" />
-                                        <TextBlock Text="{Binding Help}" Classes="meta" TextWrapping="Wrap"
-                                                   IsVisible="{Binding Help, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                                        <TextBox Text="{Binding Text}" PlaceholderText="{Binding Placeholder}" MinWidth="320"
-                                                 IsVisible="{Binding IsText}" />
-                                        <TextBox Text="{Binding Text}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80"
-                                                 MinWidth="320" IsVisible="{Binding IsMultiline}" />
-                                        <ComboBox ItemsSource="{Binding Options}" SelectedItem="{Binding Choice}" MinWidth="240"
-                                                  PlaceholderText="Pick one" IsVisible="{Binding IsChoice}" />
-                                        <ItemsControl ItemsSource="{Binding Choices}" IsVisible="{Binding IsMultiChoice}">
-                                            <ItemsControl.ItemsPanel>
-                                                <ItemsPanelTemplate><WrapPanel ItemSpacing="16" /></ItemsPanelTemplate>
-                                            </ItemsControl.ItemsPanel>
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate x:DataType="{x:Type dc:SelectableItem, x:TypeArguments=x:String}">
-                                                    <CheckBox Content="{Binding Label}" IsChecked="{Binding IsSelected}" />
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                        <CheckBox Content="{Binding Label}" IsChecked="{Binding IsChecked}" IsVisible="{Binding IsToggle}" />
-                                        <TextBlock Text="{Binding Error}" Classes="error" Margin="0" TextWrapping="Wrap"
-                                                   IsVisible="{Binding Error, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
-                                    </StackPanel>
-                                </DataTemplate>
-                            </ItemsControl.ItemTemplate>
                         </ItemsControl>
                     </StackPanel>
                 </Border>

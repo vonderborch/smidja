@@ -1,4 +1,7 @@
+using System.Text.Json;
+using Afl.Core.Authoring;
 using Afl.Core.Constants;
+using Afl.Core.Execution;
 using Afl.Core.Flow;
 using Afl.Core.GitHosts;
 using Afl.Core.Jira;
@@ -1041,7 +1044,7 @@ public class PageRenderTests : AbstractUiTest
         RightClick(window, RowOf(listings, l => l is LibraryEntry { Id: "feature" }));
         Assert.Equal("feature", workflows.SelectedListing?.Id);
         var menu = OpenMenu(listings);
-        Assert.Equal(["Duplicate…", "Copy id", "Delete…"], VisibleItems(menu));
+        Assert.Equal(["Duplicate…", "Copy id", "Improve with AI…", "Delete…"], VisibleItems(menu));
         Assert.False(menu.Items.OfType<MenuItem>().Single(i => (string?)i.Header == "Delete…").IsEnabled);
         Save(window, "workflows-listing-menu");
         menu.Close();
@@ -1102,7 +1105,7 @@ public class PageRenderTests : AbstractUiTest
             ContextClicks.IsEnabled = true;
             ControlClick(window, RowOf(listings, l => l is LibraryEntry { Id: "feature" }));
             Assert.Equal("feature", workflows.SelectedListing?.Id);
-            Assert.Equal(["Duplicate…", "Copy id", "Delete…"], VisibleItems(OpenMenu(listings)));
+            Assert.Equal(["Duplicate…", "Copy id", "Improve with AI…", "Delete…"], VisibleItems(OpenMenu(listings)));
             Save(window, "workflows-control-click-menu");
             OpenMenu(listings).Close();
             Pump();
@@ -1225,6 +1228,112 @@ public class PageRenderTests : AbstractUiTest
         item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
         menu.Close();
         Pump();
+    }
+
+    [AvaloniaFact]
+    public async Task AiDraft_AsksAQuestion_ThenIsReviewedAndApprovedIntoTheLibrary()
+    {
+        using var shell = this.CreateShell();
+        var turn = 0;
+        this.Executor.Respond = r =>
+        {
+            if (turn++ == 0)
+            {
+                return new ExecutionResult(ExecutionStatus.Completed,
+                    "Before I start:\n\n```afl-ask\n{\"questions\": [{\"label\": \"Which commit style?\", \"help\": \"e.g. Conventional Commits\"}]}\n```",
+                    r.SessionId);
+            }
+
+            File.WriteAllText(Path.Combine(r.WorkingDirectory, AuthoringConstants.DraftFileName), JsonSerializer.Serialize(new
+            {
+                schemaVersion = "1.1", id = "commit-messages", name = "Commit messages",
+                description = "Write Conventional Commits messages.", tags = new[] { "git" },
+                content = "# Commit messages\n\nUse `type(scope): subject`, e.g. `feat(cli): add author verbs`.\n",
+            }));
+            return new ExecutionResult(ExecutionStatus.Completed,
+                "Wrote a **Conventional Commits** skill: the `type(scope): subject` form, the common types, and when to mark a breaking change.",
+                r.SessionId);
+        };
+
+        var app = new AppShell(new NiddyAppOptions
+        {
+            StartingPage = PageId.Of<SkillsPage>(),
+            AppDataContext = shell,
+            Layout = pages => new ShellLayout(pages) { DataContext = shell },
+        });
+        var window = new Window { Width = 1440, Height = 900, Content = app };
+        window.Show();
+        Pump();
+        var skills = Assert.IsType<LibraryPageDataContext>(CurrentPage(window).DataContext);
+
+        // New with AI… asks what to draft; Start waits for a description.
+        window.GetVisualDescendants().OfType<Button>().Single(b => Equals(b.Content, "New with AI…"))
+            .RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        var dialog = await WaitForDialogAsync(window, null);
+        var request = Assert.IsType<AuthorRequestDataContext>(dialog.GetVisualDescendants().OfType<AuthorRequestView>().Single().DataContext);
+        Assert.False(request.CanStart);
+        request.Description = "A skill for writing conventional commit messages";
+        Pump();
+        Save(dialog, "author-new");
+        Click(dialog, "Start");
+
+        // The agent asks a question; the draft shows beside the list, and its run stays off the Runs page.
+        var session = await WaitForDraftAsync(skills);
+        Assert.True(session.ShowsInputs, session.ErrorMessage);
+        Assert.Single(session.Inputs);
+        Assert.DoesNotContain(shell.Runs.List(), r => r.Id == session.RunId);
+        Assert.Single(skills.AiDrafts);
+        Assert.True(skills.AiDrafts[0].NeedsYou);
+        Save(window, "author-question");
+
+        session.Inputs[0].Text = "Conventional Commits";
+        session.Answer();
+        await WaitForDraftAsync(skills);
+        Assert.True(session.ShowsReview, session.ErrorMessage);
+        Assert.True(session.CanApprove);
+        Assert.Equal("commit-messages — Commit messages", session.DraftLine?.Split(" (")[0]);
+        foreach (var expander in window.GetVisualDescendants().OfType<Expander>().Where(e => e.Header as string == "Draft JSON"))
+        {
+            expander.IsExpanded = true;
+        }
+
+        Pump();
+        Save(window, "author-review");
+
+        // Approve saves it to the global library and the draft leaves the list.
+        session.SaveScope = WorkflowScope.Global;
+        session.Approve();
+        await WaitForDraftAsync(skills);
+        Pump();
+        Assert.True(session.IsSaved, session.ErrorMessage);
+        Assert.Contains(skills.Listings, l => l.Id == "commit-messages" && l.Scope == WorkflowScope.Global);
+        Assert.Empty(skills.AiDrafts);
+    }
+
+    /// <summary>
+    ///     Waits for the AI draft open on a Library page to finish what its agent is doing.
+    /// </summary>
+    /// <param name="page">The page.</param>
+    /// <returns>The draft.</returns>
+    private static async Task<AuthoringSessionDataContext> WaitForDraftAsync(LibraryPageDataContext page)
+    {
+        for (var i = 0; i < 100 && page.ActiveAuthoring is null && page.ErrorMessage is null; i++)
+        {
+            Pump();
+            await Task.Delay(10);
+        }
+
+        var session = page.ActiveAuthoring;
+        Assert.True(session is not null, page.ErrorMessage);
+        for (var i = 0; i < 200 && session.IsDriving; i++)
+        {
+            Pump();
+            await Task.Delay(10);
+        }
+
+        Assert.False(session.IsDriving);
+        Pump();
+        return session;
     }
 
     /// <summary>

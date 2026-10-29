@@ -1,5 +1,6 @@
 using Afl.Core.Constants;
 using Afl.UI.DataContexts;
+using Afl.UI.Views;
 using Avalonia.Controls;
 using Avalonia.VisualTree;
 using Avalonia.Input;
@@ -25,6 +26,7 @@ public abstract partial class AbstractLibraryPage : AbstractAflPage<LibraryPageD
     {
         this.InitializeComponent();
         this.AddHandler(LostFocusEvent, this.OnFieldLostFocus, RoutingStrategies.Bubble, true);
+        this.AuthoringView.OpenInEditorRequested += this.OnOpenAiDraftInEditor;
     }
 
     /// <summary>
@@ -312,6 +314,60 @@ public abstract partial class AbstractLibraryPage : AbstractAflPage<LibraryPageD
         if (!string.IsNullOrWhiteSpace(id))
         {
             workflows.Duplicate(id);
+        }
+    }
+
+    /// <summary>
+    ///     Asks what to draft, and starts an AI draft of a new document.
+    /// </summary>
+    /// <param name="sender">The button.</param>
+    /// <param name="e">The event.</param>
+    private async void OnNewWithAi(object? sender, RoutedEventArgs e)
+    {
+        var request = this.Workflows.NewAuthorRequest();
+        if (await AuthorRequestView.Open(this, request))
+        {
+            this.Workflows.StartAuthoring(request);
+        }
+    }
+
+    /// <summary>
+    ///     Asks what to change, and starts an AI draft improving the selected document.
+    /// </summary>
+    /// <param name="sender">The button or menu item.</param>
+    /// <param name="e">The event.</param>
+    private async void OnImproveWithAi(object? sender, RoutedEventArgs e)
+    {
+        if (this.Workflows.ImproveAuthorRequest() is { } request && await AuthorRequestView.Open(this, request))
+        {
+            this.Workflows.StartAuthoring(request);
+        }
+    }
+
+    /// <summary>
+    ///     Opens the clicked AI draft beside the list.
+    /// </summary>
+    /// <param name="sender">The list.</param>
+    /// <param name="e">The event.</param>
+    private void OnAiDraftSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (this.AiDraftList.SelectedItem is AuthoringRowDataContext row)
+        {
+            this.AiDraftList.SelectedItem = null;
+            this.Workflows.OpenAuthoring(row.Id);
+        }
+    }
+
+    /// <summary>
+    ///     Opens the AI draft in the editor, once replacing unsaved changes there is confirmed.
+    /// </summary>
+    /// <param name="sender">The draft's view.</param>
+    /// <param name="e">The event.</param>
+    private async void OnOpenAiDraftInEditor(object? sender, EventArgs e)
+    {
+        if (await this.ConfirmDiscardAsync())
+        {
+            this.Workflows.OpenAuthoringInEditor();
         }
     }
 

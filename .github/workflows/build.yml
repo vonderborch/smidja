@@ -1,0 +1,45 @@
+# Builds the afl tool (CLI, core and desktop UI) on Windows, Linux and macOS, and runs the tests.
+# Runs on pushes and pull requests to main, and is called by release.yml before a release is built.
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_call:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Build
+        run: dotnet build tool/Afl.slnx -c Release
+
+      # Many tests drive fake agents through shell scripts, so they run only where there's a POSIX shell.
+      - name: Test
+        if: runner.os != 'Windows'
+        run: |
+          git config --global user.name "afl ci"
+          git config --global user.email "afl-ci@users.noreply.github.com"
+          git config --global init.defaultBranch main
+          dotnet test tool/Afl.slnx -c Release --no-build

@@ -2,6 +2,7 @@ using System.Text.Json;
 using Afl.Core.Constants;
 using Afl.Core.Exceptions;
 using Afl.Core.Execution;
+using Afl.Core.Helpers;
 using Afl.Core.Permissions;
 using Afl.Core.Repos;
 using Afl.Core.Runs;
@@ -323,7 +324,7 @@ public class PermissionTests : AbstractAflTest
     {
         var guards = PermissionConstants.DefaultGuardRules.ToArray();
 
-        Assert.Equal("Read(~/.afl/**)", Call("Glob", new { pattern = "*", path = Path.Combine(Home, ".afl", "worktrees") }, guards).BlockedBy);
+        Assert.Equal("Read(~/.afl/**)", Call("Glob", new { pattern = "*", path = Path.Combine(Home, ".afl", "runs") }, guards).BlockedBy);
         Assert.Equal("Read(~/.afl/**)", Call("Glob", new { pattern = Home + "/.afl/runs/**/*.json" }, guards).BlockedBy);
         Assert.Equal("Read(~/.afl/**)", Call("Grep", new { pattern = "token", path = "~/.afl" }, guards).BlockedBy);
         Assert.Equal("Read(~/.ssh/**)", Call("Read", new { file_path = Home + "/.ssh/id_ed25519" }, guards).BlockedBy);
@@ -336,6 +337,21 @@ public class PermissionTests : AbstractAflTest
         Assert.Null(Call("Read", new { file_path = "/repo/.afl-notes.md" }, guards).BlockedBy);
         Assert.Null(Call("Read", new { file_path = Home + "/.aflx/a" }, guards).BlockedBy);
         Assert.Null(Call("WebFetch", new { url = "https://github.com" }, guards).BlockedBy);
+    }
+
+    [Fact]
+    public void GuardRails_LeaveAgentsTheirWorktrees()
+    {
+        var guards = PermissionConstants.DefaultGuardRules.ToArray();
+        var paths = new AflPaths(Path.Combine(Home, PathConstants.AflDirectoryName));
+        var worktree = Path.Combine(paths.WorktreesDirectory, "run-1");
+        var file = Path.Combine(worktree, "src", "a.cs");
+
+        Assert.Null(Call("Read", new { file_path = file }, guards).BlockedBy);
+        Assert.Null(Call("Edit", new { file_path = file }, guards).BlockedBy);
+        Assert.Null(Call("Write", new { file_path = file }, guards).BlockedBy);
+        Assert.Null(Call("Glob", new { pattern = "**/*.cs", path = worktree }, guards).BlockedBy);
+        Assert.Equal("Edit(~/.afl/**)", Call("Write", new { file_path = paths.SettingsFile }, guards).BlockedBy);
     }
 
     [Fact]
@@ -360,7 +376,7 @@ public class PermissionTests : AbstractAflTest
     [Fact]
     public async Task Ask_DoesNotAskAboutCallsAGuardRailBlocks()
     {
-        var blocked = Call("Glob", new { pattern = "*", path = Home + "/.afl/worktrees" }, [.. PermissionConstants.DefaultGuardRules]);
+        var blocked = Call("Glob", new { pattern = "*", path = Home + "/.afl/runs" }, [.. PermissionConstants.DefaultGuardRules]);
         this._executor.Respond = _ => Refused("draft", blocked);
         var run = this.Engine.Create(this.RegisterRepo(), Workflow(Ai("fix", "Fix it")), SampleTicket());
 

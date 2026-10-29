@@ -185,7 +185,7 @@ public static class TextRendering
     /// </summary>
     /// <param name="step">The step.</param>
     /// <param name="writer">The writer.</param>
-    private static void StepBody(StepView step, TextWriter writer)
+    internal static void StepBody(StepView step, TextWriter writer)
     {
         WriteBlock(writer, "Error", step.Error);
         WriteBlock(writer, step.Status == StepStatus.AwaitingUser && step.Interactive is null ? "Instructions" : "Prompt",
@@ -1120,7 +1120,7 @@ public static class TextRendering
     /// </summary>
     /// <param name="value">The status.</param>
     /// <returns>The kebab-case name.</returns>
-    private static string Name(Enum value)
+    internal static string Name(Enum value)
     {
         return JsonNamingPolicy.KebabCaseLower.ConvertName(value.ToString());
     }

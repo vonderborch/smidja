@@ -252,40 +252,68 @@ public class RunPermitCommand : AbstractStepRunCommand
     [Option("accept-output", HelpText = "Keep what the AI did without what it was refused: undecided requests are denied and the step finishes.")]
     public bool AcceptOutput { get; set; }
 
-    /// <inheritdoc />
-    protected override Task<Run> ActAsync(RunEngine engine, CancellationToken ct)
+    /// <summary>
+    ///     Works out the decisions from the permit options, asking in a terminal when none were given.
+    /// </summary>
+    /// <param name="output">The output, for asking.</param>
+    /// <param name="open">The requests still open.</param>
+    /// <param name="once">The <c>--once</c> values.</param>
+    /// <param name="always">The <c>--always</c> values.</param>
+    /// <param name="deny">The <c>--deny</c> values.</param>
+    /// <param name="all">The <c>--all</c> value, or null.</param>
+    /// <param name="scope">Where always rules are saved.</param>
+    /// <param name="acceptOutput">Whether <c>--accept-output</c> was given.</param>
+    /// <param name="showCommand">The command that lists the requests, for errors.</param>
+    /// <returns>The decisions.</returns>
+    /// <exception cref="AflException">An option is malformed, or nothing was decided.</exception>
+    public static List<PermissionChoice> ChoicesFrom(
+        AbstractOutputWriter output,
+        IReadOnlyList<PermissionRequest> open,
+        IEnumerable<string> once,
+        IEnumerable<string> always,
+        IEnumerable<string> deny,
+        string? all,
+        PermissionScope scope,
+        bool acceptOutput,
+        string showCommand)
     {
-        var target = this.TargetOf(engine);
-        var state = engine.Store.GetRequired(target).CurrentStep;
-        var open = state?.OpenPermissionRequests ?? [];
-        var scope = AbstractPermissionCommand.ParseScope(this.Scope);
         var choices = new Dictionary<int, PermissionChoice>();
-        this.Collect(choices, this.Once, PermissionDecision.Once, scope);
-        this.Collect(choices, this.Always, PermissionDecision.Always, scope);
-        this.Collect(choices, this.Deny, PermissionDecision.Deny, scope);
-        if (this.All is not null)
+        Collect(choices, once, PermissionDecision.Once, scope, showCommand);
+        Collect(choices, always, PermissionDecision.Always, scope, showCommand);
+        Collect(choices, deny, PermissionDecision.Deny, scope, showCommand);
+        if (all is not null)
         {
-            var decision = Enum.TryParse<PermissionDecision>(this.All.Trim(), true, out var all)
-                ? all
-                : throw new AflException(AflErrorKind.InvalidInput, $"--all takes once, always or deny, not '{this.All}'.");
+            var decision = Enum.TryParse<PermissionDecision>(all.Trim(), true, out var parsed)
+                ? parsed
+                : throw new AflException(AflErrorKind.InvalidInput, $"--all takes once, always or deny, not '{all}'.");
             foreach (var request in open.Where(r => !choices.ContainsKey(r.Index)))
             {
                 choices[request.Index] = new PermissionChoice(request.Index, decision, null, scope);
             }
         }
 
-        if (choices.Count == 0 && !this.AcceptOutput)
+        if (choices.Count == 0 && !acceptOutput)
         {
-            this.AskInTerminal(choices, open, scope);
+            AskInTerminal(output, choices, open, scope);
         }
 
-        if (choices.Count == 0 && !this.AcceptOutput)
+        if (choices.Count == 0 && !acceptOutput)
         {
             throw new AflException(AflErrorKind.InvalidInput,
-                "Say what to allow: --once N, --always N[=rule], --deny N, --all once|always|deny, or --accept-output (see afl run show).");
+                $"Say what to allow: --once N, --always N[=rule], --deny N, --all once|always|deny, or --accept-output (see {showCommand}).");
         }
 
-        return engine.PermitAsync(target, choices.Values.ToList(), this.AcceptOutput, this.Output, ct);
+        return choices.Values.ToList();
+    }
+
+    /// <inheritdoc />
+    protected override Task<Run> ActAsync(RunEngine engine, CancellationToken ct)
+    {
+        var target = this.TargetOf(engine);
+        var open = engine.Store.GetRequired(target).CurrentStep?.OpenPermissionRequests ?? [];
+        var choices = ChoicesFrom(this.Output, open, this.Once, this.Always, this.Deny, this.All,
+            AbstractPermissionCommand.ParseScope(this.Scope), this.AcceptOutput, $"afl run show {this.RunId}");
+        return engine.PermitAsync(target, choices, this.AcceptOutput, this.Output, ct);
     }
 
     /// <summary>
@@ -295,8 +323,14 @@ public class RunPermitCommand : AbstractStepRunCommand
     /// <param name="values">The option's values.</param>
     /// <param name="decision">The decision the option makes.</param>
     /// <param name="scope">Where an always rule is saved.</param>
+    /// <param name="showCommand">The command that lists the requests, for errors.</param>
     /// <exception cref="AflException">A value isn't a request number, or a request is named twice.</exception>
-    private void Collect(Dictionary<int, PermissionChoice> choices, IEnumerable<string> values, PermissionDecision decision, PermissionScope scope)
+    private static void Collect(
+        Dictionary<int, PermissionChoice> choices,
+        IEnumerable<string> values,
+        PermissionDecision decision,
+        PermissionScope scope,
+        string showCommand)
     {
         foreach (var value in values)
         {
@@ -306,7 +340,7 @@ public class RunPermitCommand : AbstractStepRunCommand
             if (!int.TryParse(number, out var index) || index < 1)
             {
                 throw new AflException(AflErrorKind.InvalidInput,
-                    $"'{value}' should start with a request number (see afl run show {this.RunId}).");
+                    $"'{value}' should start with a request number (see {showCommand}).");
             }
 
             if (decision == PermissionDecision.Deny && rule is not null)
@@ -324,20 +358,21 @@ public class RunPermitCommand : AbstractStepRunCommand
     /// <summary>
     ///     Asks about each open request in a terminal: allow once, always (with which rule) or deny.
     /// </summary>
+    /// <param name="output">The output, for asking.</param>
     /// <param name="choices">The choices, added to.</param>
     /// <param name="open">The open requests.</param>
     /// <param name="scope">Where always rules are saved.</param>
-    private void AskInTerminal(Dictionary<int, PermissionChoice> choices, IReadOnlyList<PermissionRequest> open, PermissionScope scope)
+    private static void AskInTerminal(AbstractOutputWriter output, Dictionary<int, PermissionChoice> choices, IReadOnlyList<PermissionRequest> open, PermissionScope scope)
     {
-        if (!this.Output.IsInteractive || Console.IsInputRedirected)
+        if (!output.IsInteractive || Console.IsInputRedirected)
         {
             return;
         }
 
         foreach (var request in open)
         {
-            this.Output.Info($"{request.Index}. {request.Denial.Display}");
-            var answer = this.Output.Ask("Allow [o]nce, [a]lways, or [d]eny? (enter to stop)")?.Trim().ToLowerInvariant();
+            output.Info($"{request.Index}. {request.Denial.Display}");
+            var answer = output.Ask("Allow [o]nce, [a]lways, or [d]eny? (enter to stop)")?.Trim().ToLowerInvariant();
             if (string.IsNullOrEmpty(answer) || !Answers.TryGetValue(answer[0], out var decision))
             {
                 return;
@@ -347,8 +382,8 @@ public class RunPermitCommand : AbstractStepRunCommand
             if (decision != PermissionDecision.Deny && request.Denial.SuggestedRules.Count > 1)
             {
                 var rules = request.Denial.SuggestedRules;
-                this.Output.Info(string.Join("\n", rules.Select((r, i) => $"   {i + 1}) {r}")));
-                var pick = this.Output.Ask("Which rule? (number or your own rule, enter for 1)")?.Trim();
+                output.Info(string.Join("\n", rules.Select((r, i) => $"   {i + 1}) {r}")));
+                var pick = output.Ask("Which rule? (number or your own rule, enter for 1)")?.Trim();
                 rule = string.IsNullOrEmpty(pick) ? null
                     : int.TryParse(pick, out var n) && n >= 1 && n <= rules.Count ? rules[n - 1]
                     : pick;

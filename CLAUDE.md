@@ -211,7 +211,10 @@ See README.md for the layout.
   (a `Conflict` outcome fails the step; retry completes the unsettled ones) and discards it on cancel. A run's agents
   work in `Run.WorkingPath ?? Run.RepoPath` (`StepContext.CreateRequest`); children inherit `WorkingPath`, while
   artifacts and the scratch directory always resolve against `RepoPath`, the main checkout, which is passed as
-  `ExecutionRequest.AdditionalDirectories` (`--add-dir` for Claude) when the two differ. `Run.MaxParallel`
+  `ExecutionRequest.AdditionalDirectories` (`--add-dir` for Claude) when the two differ. `worktree` checkouts live in
+  `AflPaths.WorktreesDirectory` (`~/.afl-worktrees/<run id>`), beside the afl home rather than in it, because the guard
+  rails deny `Read`/`Edit` of `~/.afl/**` and Claude applies a deny rule even to its own working directory; keep any
+  folder agents work in out of the home the same way (as `AuthoringWorkspacesDirectory` does). `Run.MaxParallel`
   (`afl start --max-parallel n`, `--sequential` = 1, inherited by children) caps how many paths or children run at once.
 - Optional steps (format 3.7): `AbstractStepDefinition.Optional` (`OptionalStep`: `Default`, `Help`). `RunEngine.Create`
   takes the starter's choices (`afl start --include/--exclude`, the UI's checklist, `Views/ChecklistView.Open` in a Niddy `Dialog.View`) and
@@ -234,6 +237,22 @@ See README.md for the layout.
   (`SkillPickerDataContext`) and `Views/StackView` (`StackDataContext`, also Repo settings → Project), both over the
   shared `PickListView`. Nothing recommended is added unless the user picks it. Other 3.4 fields: `OutputTemplate` (the output rendered from `{{inputs.x}}` and `{{output}}`) and
   `advance: approve-final` (approval only on a loop's last pass).
+- Authoring (the AI helper, `Afl.Core/Authoring/`): a kind of document an AI can draft is one `AbstractAuthoringKind`
+  (`[AuthoringKindRegistration("skill"|"step"|"workflow")]`, `AuthoringKindRegistry`) giving its library, `Parse`,
+  `Validate`, `Catalog` (what exists already, for the prompt), its embedded schema/format reference and `Save`.
+  `AuthoringService` owns a draft end to end: an `AuthoringSession` (`AuthoringStore`, `~/.afl/authoring/<id>/`, with
+  `draft.json` beside it) and a one-step run built in code (`RunKind.Authoring`, a synthetic repo whose path is the
+  session folder, the selected repo only in `directories` and never writable, policy always `ask`, WebSearch allowed
+  and WebFetch left to the permission prompt). Its step is the internal `author-draft` type
+  (`AuthorDraftStepHandler`): after each turn it validates `draft.json` through the kind and resumes the same session
+  to fix problems, up to `MaxFixRounds`; leftover problems block Approve. Questions, permissions, Request changes and
+  approval are the ordinary run machinery; `AuthoringService.ApproveAsync` re-validates and saves through the kind
+  (`overwrite` to replace; a built-in base is saved as a global/repo copy). `AuthoringView.Status` is what
+  front-ends show. `RunStore.List` leaves authoring runs out unless `includeAuthoring`, so the Runs page and
+  `afl runs` never see them. Handlers with `AbstractStepHandler.IsInternal` are left out of the builder, the schema
+  and `StepHandlerRegistry.PublicKeys`, and rejected in user workflows and common steps. CLI: `afl author-*`; UI:
+  "New/Improve with AI…" and the "AI drafts" list on the Library pages (`LibraryPageDataContext.Authoring.cs`,
+  `AuthoringSessionDataContext`, `Views/AuthoringSessionView`).
 - Work without a ticket: `LocalTicketSource` (`local:<name>`, `afl start --name`) makes a ticket from a name. The
   scratch directory (`AflSettings.ScratchDirectory`, copied to `Run.ScratchRoot`) is `ScratchArea`: made when a run
   uses a `scratch.` variable or saves an artifact there, with a self-ignoring `.gitignore`; it is never tracked.
@@ -369,7 +388,15 @@ See README.md for the layout.
   shows dialogs as windows, which close on a later dispatcher turn, so UI tests pump until `OwnedWindows` is empty. With `IsEditable`
   it is an editor with a Preview toggle that writes back to its two-way `Markdown` binding. It's used for step output,
   prompts, candidates and earlier attempts on Runs, issue bodies, step prompts and SKILL.md. A step artifact ending in
-  `.md` / `.markdown` (`UiConverters.IsMarkdownPath`) gets a Preview link next to Open.
+  `.md` / `.markdown` (`UiConverters.IsMarkdownPath`) gets a Preview link next to Open. Diagrams (`Afl.UI/Diagrams/`):
+  a fenced block whose language has an `AbstractDiagramRenderer` (`[DiagramRendererRegistration("mermaid")]`,
+  `DiagramRendererRegistry`; mermaid is drawn by Mermaider, no browser) is shown as an SVG picture, themed light or
+  dark, cached by source. `DiagramMarkdownPlugin` replaces Markdown.Avalonia's fenced-block parser
+  (`CodeBlocksWithLangEvaluator`, a `BlockOverride2`; a `RegisterTop` parser never gets the block) and hands other
+  languages to a stock engine, so highlighting is unchanged; one that fails shows as code with a note why.
+  `MarkdownView` must assign a new `MdAvPlugins` (adding to the existing one doesn't take). The Skia SVG renderer
+  ignores CSS variables, `color-mix()` and `rem`, so `AbstractDiagramRenderer.Render` passes every SVG through
+  `SvgCssFlattener`; a new language is one renderer subclass.
 - Never block on async work (`GetAwaiter().GetResult()`) unless every await beneath it uses
   `ConfigureAwait(false)`: the UI and the headless tests run on Avalonia's dispatcher and would deadlock.
 - UI tests (`tests/Afl.UI.Tests`, xunit v3 + Avalonia.Headless) run `TestApp` (the app's own shell over a scratch

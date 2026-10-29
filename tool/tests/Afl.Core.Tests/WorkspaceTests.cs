@@ -80,6 +80,20 @@ public class WorkspaceTests : AbstractAgentPoolTest
     private Run Get(string id) => new RunStore(this.Paths).GetRequired(id);
 
     [Fact]
+    public async Task Worktree_PutsChildrenOutsideTheAflHome_WhereTheGuardRailsLetTheirAgentsWork()
+    {
+        this.SaveChild();
+        var run = this.Start("main", Build("a"));
+
+        run = await this.Engine.DriveAsync(run.Id);
+
+        Assert.Equal(RunStatus.Done, run.Status);
+        var directory = Assert.Single(this.Seen).Directory;
+        Assert.False(directory.StartsWith(this.Paths.Root + Path.DirectorySeparatorChar, StringComparison.Ordinal));
+        Assert.Equal(this.Paths.Root + PathConstants.WorktreesSuffix, Path.GetDirectoryName(directory));
+    }
+
+    [Fact]
     public async Task Worktree_GivesEachChildItsOwnCheckout_AndMergesItsWorkBack()
     {
         this.SaveChild();

@@ -398,6 +398,34 @@ public class AiStepDefinition : AbstractAgentStepDefinition;
 public class InteractiveStepDefinition : AbstractAgentStepDefinition;
 
 /// <summary>
+///     An <c>author-draft</c> step, internal to the AI authoring helper: an <c>ai</c> step that writes a skill, common
+///     step or workflow to a draft file, which is checked (and sent back to the AI to fix) before the user reviews it.
+/// </summary>
+public class AuthorDraftStepDefinition : AiStepDefinition
+{
+    /// <summary>
+    ///     Gets or sets the kind of document drafted (an <see cref="Authoring.AuthoringKindRegistry" /> name).
+    /// </summary>
+    public string Kind { get; set; } = string.Empty;
+
+    /// <summary>
+    ///     Gets or sets the draft file, relative to where the run works.
+    /// </summary>
+    public string DraftFile { get; set; } = AuthoringConstants.DraftFileName;
+
+    /// <summary>
+    ///     Gets or sets the repo whose library the draft is checked against (its common steps, workflows and skills),
+    ///     or null for the global library only.
+    /// </summary>
+    public string? LibraryRepoPath { get; set; }
+
+    /// <summary>
+    ///     Gets or sets how many times a draft that doesn't check out is sent back to the AI before the user sees it.
+    /// </summary>
+    public int MaxFixRounds { get; set; } = AuthoringConstants.DefaultMaxFixRounds;
+}
+
+/// <summary>
 ///     A <c>user</c> step: the user does it, following its instructions, and marks it done.
 /// </summary>
 public class UserStepDefinition : AbstractStepDefinition
@@ -479,7 +507,7 @@ public class StepDefinitionConverter : JsonConverter<AbstractStepDefinition>
         {
             var id = node["id"]?.GetValue<string>();
             throw new JsonException(
-                $"Step '{id}' has unknown type '{type}'. Known: {string.Join(", ", StepHandlerRegistry.Instance.Keys.Order())}.");
+                $"Step '{id}' has unknown type '{type}'. Known: {string.Join(", ", StepHandlerRegistry.Instance.PublicKeys)}.");
         }
 
         return (AbstractStepDefinition)node.Deserialize(StepHandlerRegistry.Instance.DefinitionTypeOf(type), options)!;

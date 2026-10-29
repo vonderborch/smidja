@@ -1,0 +1,143 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:dc="using:Afl.UI.DataContexts"
+             xmlns:views="using:Afl.UI.Views"
+             x:Class="Afl.UI.Views.AuthoringSessionView"
+             x:DataType="dc:AuthoringSessionDataContext">
+    <DockPanel>
+
+        <!-- What's being drafted, and where it is -->
+        <StackPanel DockPanel.Dock="Top" Spacing="4" Margin="0,0,0,8">
+            <DockPanel>
+                <Button DockPanel.Dock="Right" Content="✕" Click="OnClose" Padding="8,2" ToolTip.Tip="Close; the draft carries on" />
+                <TextBlock Classes="state" DockPanel.Dock="Right" VerticalAlignment="Center" Margin="0,0,8,0" Text="{Binding Status}" />
+                <TextBlock Classes="h2" Text="{Binding Title}" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+            </DockPanel>
+            <TextBlock Classes="meta" Text="{Binding AgentLine}" TextTrimming="CharacterEllipsis" />
+            <TextBlock TextWrapping="Wrap" MaxLines="4" TextTrimming="CharacterEllipsis"
+                       Text="{Binding Description, StringFormat='Asked for: {0}'}"
+                       IsVisible="{Binding Description, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+            <TextBlock Classes="error" TextWrapping="Wrap" Text="{Binding ErrorMessage}"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        </StackPanel>
+
+        <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+            <Button Content="Stop" Click="OnStop" IsVisible="{Binding CanStop}"
+                    ToolTip.Tip="Stop the agent; Continue picks the draft up again" />
+            <Button Content="Discard…" Click="OnDiscard" ToolTip.Tip="Delete the draft and its run; anything already saved stays" />
+        </StackPanel>
+
+        <ScrollViewer>
+            <StackPanel Spacing="10">
+
+                <!-- The agent's work failed -->
+                <Border Classes="step" IsVisible="{Binding ShowsRetry}">
+                    <StackPanel Spacing="8">
+                        <TextBlock Classes="error" Margin="0" TextWrapping="Wrap" Text="{Binding Failure}" />
+                        <Button Classes="accent" Content="Try again" Click="OnRetry" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Idle without asking anything, e.g. after the app was closed mid-draft -->
+                <Border Classes="step" IsVisible="{Binding ShowsResume}">
+                    <StackPanel Spacing="8">
+                        <TextBlock TextWrapping="Wrap" Text="The agent isn't working on this draft right now." />
+                        <Button Classes="accent" Content="Continue" Click="OnResume" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+
+                <!-- The tools the agent was refused, e.g. reading a new site -->
+                <Border Classes="step" IsVisible="{Binding ShowsPermissions}">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="The agent needs permission" FontWeight="SemiBold" />
+                        <TextBlock Classes="meta" TextWrapping="Wrap"
+                                   Text="Allow once gives the agent the rule for its next turn only. Always allow saves it to this draft's run or to every repo. Deny keeps refusing it; the agent carries on without it." />
+                        <ItemsControl ItemsSource="{Binding PermissionRequests}" ItemTemplate="{StaticResource PermissionRequestRow}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Spacing="12" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Classes="accent" Content="Continue" Click="OnPermit" IsEnabled="{Binding CanContinuePermit}" />
+                            <Button Content="Accept draft as is" Click="OnAcceptOutput"
+                                    ToolTip.Tip="Go to review with the draft as it is, allowing nothing" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <!-- The agent's questions -->
+                <Border Classes="step" IsVisible="{Binding ShowsInputs}">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="The agent has questions" FontWeight="SemiBold" />
+                        <ItemsControl ItemsSource="{Binding Inputs}" ItemTemplate="{StaticResource StepInputRow}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate><StackPanel Spacing="10" /></ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                        </ItemsControl>
+                        <Button Classes="accent" Content="Send answers" Click="OnAnswer" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Saved -->
+                <TextBlock Classes="ok" TextWrapping="Wrap" Text="{Binding SavedLine}" IsVisible="{Binding IsSaved}" />
+
+                <!-- The review card -->
+                <Border Classes="step" IsVisible="{Binding ShowsReview}">
+                    <StackPanel Spacing="10">
+                        <TextBlock Text="Review the draft" FontWeight="SemiBold" />
+                        <views:MarkdownView Markdown="{Binding Summary, Mode=OneWay}" Title="Agent's summary"
+                                            IsVisible="{Binding Summary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                        <StackPanel Spacing="2">
+                            <TextBlock FontWeight="SemiBold" TextWrapping="Wrap" Text="{Binding DraftLine}" />
+                            <TextBlock TextWrapping="Wrap" Text="{Binding DraftDescription}"
+                                       IsVisible="{Binding DraftDescription, Converter={x:Static StringConverters.IsNotNullOrEmpty}}" />
+                            <TextBlock Classes="meta" Text="{Binding TagLine}"
+                                       IsVisible="{Binding TagLine, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                        </StackPanel>
+                        <StackPanel Spacing="2" IsVisible="{Binding HasProblems}">
+                            <TextBlock Classes="error" Margin="0" Text="Fix these before approving (Request changes, or Open in editor):" />
+                            <ItemsControl ItemsSource="{Binding Problems}">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate x:DataType="x:String">
+                                        <TextBlock Classes="error" Margin="0" TextWrapping="Wrap" Text="{Binding StringFormat='• {0}'}" />
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
+                        <Expander Header="Draft JSON" HorizontalAlignment="Stretch" IsVisible="{Binding HasDraftFile}">
+                            <Border Classes="console" MaxHeight="320">
+                                <ScrollViewer>
+                                    <SelectableTextBlock Text="{Binding Draft}" FontFamily="{StaticResource MonoFont}" FontSize="12" TextWrapping="Wrap" />
+                                </ScrollViewer>
+                            </Border>
+                        </Expander>
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <ComboBox ItemsSource="{Binding SaveScopes}" SelectedItem="{Binding SaveScope}" MinWidth="100"
+                                      ToolTip.Tip="Save to every repo (global) or only the selected repo" />
+                            <CheckBox Content="Replace if it exists" IsChecked="{Binding Overwrite}" />
+                            <Button Classes="accent" Content="Approve" Click="OnApprove" IsEnabled="{Binding CanApprove}"
+                                    ToolTip.Tip="Save the draft to the library" />
+                            <Button Content="Open in editor" Click="OnOpenInEditor"
+                                    ToolTip.Tip="Tweak the draft in the editor; Save there approves it" />
+                        </StackPanel>
+                        <TextBox Text="{Binding Feedback}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="48"
+                                 PlaceholderText="What to change, e.g. also cover breaking changes" />
+                        <Button Content="Request changes" Click="OnRequestChanges" HorizontalAlignment="Left"
+                                ToolTip.Tip="Send the draft back to the agent with your feedback" />
+                    </StackPanel>
+                </Border>
+
+                <!-- Live output -->
+                <StackPanel Spacing="4" IsVisible="{Binding Output, Converter={x:Static StringConverters.IsNotNullOrEmpty}}">
+                    <TextBlock Classes="meta" Text="Agent output" />
+                    <Border Classes="console" MaxHeight="280">
+                        <ScrollViewer x:Name="OutputScroller">
+                            <SelectableTextBlock Text="{Binding Output}" FontFamily="{StaticResource MonoFont}" FontSize="12"
+                                                 TextWrapping="Wrap" />
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+    </DockPanel>
+</UserControl>

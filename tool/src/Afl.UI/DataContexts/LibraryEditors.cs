@@ -68,6 +68,11 @@ public abstract class AbstractLibraryEditor
     public abstract string Noun { get; }
 
     /// <summary>
+    ///     Gets the kind of document the AI helper drafts for this editor (an <c>AuthoringKindRegistry</c> name).
+    /// </summary>
+    public abstract string AuthoringKind { get; }
+
+    /// <summary>
     ///     Gets whether a document has a list of steps (otherwise exactly one).
     /// </summary>
     public virtual bool HasSteps => true;
@@ -173,6 +178,22 @@ public abstract class AbstractLibraryEditor
     /// <returns>The path.</returns>
     public abstract string PathFor(WorkflowLibrary library, string id, WorkflowScope scope);
 
+    /// <summary>
+    ///     Reads a document from a file outside the library, e.g. an AI draft, as a draft.
+    /// </summary>
+    /// <param name="library">The workflow library as the selected repo sees it.</param>
+    /// <param name="path">The file.</param>
+    /// <returns>The draft.</returns>
+    public abstract WorkflowDefinition ReadExternal(WorkflowLibrary library, string path);
+
+    /// <summary>
+    ///     Writes a draft as the JSON its library saves.
+    /// </summary>
+    /// <param name="library">The workflow library as the selected repo sees it.</param>
+    /// <param name="draft">The draft.</param>
+    /// <returns>The JSON.</returns>
+    public abstract string Serialize(WorkflowLibrary library, WorkflowDefinition draft);
+
     /// <inheritdoc />
     public override string ToString()
     {
@@ -274,6 +295,18 @@ public abstract class AbstractLibraryEditor<TDocument, TListing> : AbstractLibra
         return this.LayerOf(library).PathFor(id, scope);
     }
 
+    /// <inheritdoc />
+    public override WorkflowDefinition ReadExternal(WorkflowLibrary library, string path)
+    {
+        return this.ToDraft(this.LayerOf(library).ReadExternal(path));
+    }
+
+    /// <inheritdoc />
+    public override string Serialize(WorkflowLibrary library, WorkflowDefinition draft)
+    {
+        return this.LayerOf(library).Serialize(this.FromDraft(draft));
+    }
+
     /// <summary>
     ///     Deep-copies a value through JSON.
     /// </summary>
@@ -297,6 +330,9 @@ public class WorkflowLibraryEditor : AbstractLibraryEditor<WorkflowDefinition, W
 
     /// <inheritdoc />
     public override string Noun => "workflow";
+
+    /// <inheritdoc />
+    public override string AuthoringKind => AuthoringConstants.KindWorkflow;
 
     /// <inheritdoc />
     public override bool HasRequirements => true;
@@ -345,6 +381,9 @@ public class CommonStepLibraryEditor : AbstractLibraryEditor<CommonStepDefinitio
 
     /// <inheritdoc />
     public override string Noun => "common step";
+
+    /// <inheritdoc />
+    public override string AuthoringKind => AuthoringConstants.KindStep;
 
     /// <inheritdoc />
     public override bool HasSteps => false;
@@ -415,6 +454,9 @@ public class SkillLibraryEditor : AbstractLibraryEditor<SkillDefinition, SkillLi
 
     /// <inheritdoc />
     public override string Noun => "skill";
+
+    /// <inheritdoc />
+    public override string AuthoringKind => AuthoringConstants.KindSkill;
 
     /// <inheritdoc />
     public override bool HasSteps => false;

@@ -16,7 +16,7 @@ namespace Afl.UI.DataContexts;
 ///     validation, and saves it as JSON to the global library (<c>~/.afl/workflows/</c>, <c>~/.afl/steps/</c>) or the
 ///     repo (<c>&lt;repo&gt;/.afl/…</c>) through the editor's layered library.
 /// </summary>
-public class LibraryPageDataContext : AbstractPageDataContext
+public partial class LibraryPageDataContext : AbstractPageDataContext
 {
     /// <summary>
     ///     The id each step had when the step ids were last handed out, to follow renames.
@@ -68,6 +68,7 @@ public class LibraryPageDataContext : AbstractPageDataContext
         this.Requires.CollectionChanged += (_, _) => this.RaisePropertyChanged(nameof(this.PartsHeader));
         this.Skills.Edited += (_, _) => this.OnDraftEdited();
         this.Tags.Edited += (_, _) => this.ApplyFilters();
+        this.InitializeAuthoring(shell);
         this.Reload();
     }
 
@@ -241,9 +242,10 @@ public class LibraryPageDataContext : AbstractPageDataContext
             if (!ReferenceEquals(field, value))
             {
                 this.RaiseAndSetIfChanged(ref field, value);
-                this.RaisePropertyChanged(nameof(this.CanDelete));
+                this.RaisePropertiesChanged(nameof(this.CanDelete), nameof(this.CanImprove));
                 if (value is not null && !this._selectingQuietly)
                 {
+                    this.CloseAuthoring();
                     this.Edit(value.Draft, value.Scope == WorkflowScope.BuiltIn ? WorkflowScope.Global : value.Scope);
                 }
             }
@@ -256,7 +258,11 @@ public class LibraryPageDataContext : AbstractPageDataContext
     public bool HasDraft
     {
         get;
-        private set => this.RaiseAndSetIfChanged(ref field, value);
+        private set
+        {
+            this.RaiseAndSetIfChanged(ref field, value);
+            this.RaisePropertiesChanged(nameof(this.ShowsEditor), nameof(this.ShowsHint));
+        }
     }
 
     /// <summary>
@@ -857,6 +863,11 @@ public class LibraryPageDataContext : AbstractPageDataContext
     /// <returns>The file written, or null if it failed.</returns>
     public string? Save()
     {
+        if (this.IsEditingAiDraft)
+        {
+            return this.SaveAiDraft();
+        }
+
         this.CommitEdit();
         string? path = null;
         var workflow = this.BuildDraft();
@@ -1056,7 +1067,7 @@ public class LibraryPageDataContext : AbstractPageDataContext
         var match = selected is null
             ? null
             : this.Listings.FirstOrDefault(l => l.Id == selected.Id && l.Scope == selected.Scope);
-        if (match is not null || this.HasDraft)
+        if (match is not null || this.HasDraft || this.HasAuthoring)
         {
             this.SelectListingQuietly(match);
         }
@@ -1064,6 +1075,8 @@ public class LibraryPageDataContext : AbstractPageDataContext
         {
             this.SelectedListing = this.Listings.FirstOrDefault();
         }
+
+        this.LoadAiDrafts();
     }
 
     /// <summary>
@@ -1147,6 +1160,7 @@ public class LibraryPageDataContext : AbstractPageDataContext
     /// <param name="saveScope">The scope to save it to.</param>
     private void Edit(WorkflowDefinition workflow, WorkflowScope saveScope)
     {
+        this.ForgetAuthoringDraft();
         this.LoadDraft(workflow);
         this.SaveScope = this.SaveScopes.Contains(saveScope) ? saveScope : WorkflowScope.Global;
         this.SelectedStep = this.Steps.FirstOrDefault();
@@ -1265,6 +1279,7 @@ public class LibraryPageDataContext : AbstractPageDataContext
     /// </summary>
     private void CloseDraft()
     {
+        this.ForgetAuthoringDraft();
         this.Untrack();
         this.Steps.Clear();
         this.Parameters.Clear();
@@ -1671,7 +1686,7 @@ public class LibraryPageDataContext : AbstractPageDataContext
             this._selectingQuietly = false;
         }
 
-        this.RaisePropertyChanged(nameof(this.CanDelete));
+        this.RaisePropertiesChanged(nameof(this.CanDelete), nameof(this.CanImprove));
     }
 
     /// <summary>

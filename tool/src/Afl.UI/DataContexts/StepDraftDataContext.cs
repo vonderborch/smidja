@@ -237,7 +237,7 @@ public class StepDraftDataContext : ReactiveObject
     /// <summary>
     ///     Gets the step types that can be chosen: every registered step handler key, e.g. "ai" or "mixed/approve".
     /// </summary>
-    public static IReadOnlyList<string> StepTypes { get; } = StepHandlerRegistry.Instance.Keys.Order().ToList();
+    public static IReadOnlyList<string> StepTypes { get; } = StepHandlerRegistry.Instance.PublicKeys;
 
     /// <summary>
     ///     Gets the choices for what happens once the step's work is done.

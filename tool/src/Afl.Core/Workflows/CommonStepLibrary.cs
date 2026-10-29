@@ -70,9 +70,9 @@ public class CommonStepLibrary(AflPaths paths, string? repoPath = null)
 
         var values = WorkflowComposer.ValuesWithDefaults(document.Parameters);
         var step = WorkflowComposer.FromNode<AbstractStepDefinition>(WorkflowComposer.SubstituteParameters(WorkflowComposer.ToNode(document.Step), values));
-        if (!StepHandlerRegistry.Instance.Contains(step.Type))
+        if (!StepHandlerRegistry.Instance.Contains(step.Type) || StepHandlerRegistry.Instance.IsInternal(step.Type))
         {
-            errors.Add($"Unknown type '{step.Type}'. Known: {string.Join(", ", StepHandlerRegistry.Instance.Keys.Order())}.");
+            errors.Add($"Unknown type '{step.Type}'. Known: {string.Join(", ", StepHandlerRegistry.Instance.PublicKeys)}.");
             return errors;
         }
 

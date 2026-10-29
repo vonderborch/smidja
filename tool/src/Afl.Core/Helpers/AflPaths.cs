@@ -65,9 +65,10 @@ public class AflPaths(string root)
     public string SkillsDirectory => Path.Combine(this.Root, PathConstants.SkillsDirectoryName);
 
     /// <summary>
-    ///     Gets the directory holding the git worktrees child runs work in.
+    ///     Gets the directory holding the git worktrees child runs work in: beside the afl home, not in it, since the
+    ///     guard rails keep agents out of the home (<c>~/.afl/**</c>) and agents work in these worktrees.
     /// </summary>
-    public string WorktreesDirectory => Path.Combine(this.Root, PathConstants.WorktreesDirectoryName);
+    public string WorktreesDirectory => this.Root.TrimEnd(Path.DirectorySeparatorChar) + PathConstants.WorktreesSuffix;
 
     /// <summary>
     ///     Gets the directory holding cached responses from services such as GitHub.
@@ -83,6 +84,17 @@ public class AflPaths(string root)
     ///     Gets the directory holding the desktop app's log files.
     /// </summary>
     public string LogsDirectory => Path.Combine(this.Root, PathConstants.LogsDirectoryName);
+
+    /// <summary>
+    ///     Gets the directory holding the AI authoring helper's session records.
+    /// </summary>
+    public string AuthoringDirectory => Path.Combine(this.Root, PathConstants.AuthoringDirectoryName);
+
+    /// <summary>
+    ///     Gets the directory holding each authoring session's work folder (its draft and the files its agent reads):
+    ///     beside the afl home, not in it, since the guard rails keep agents out of the home (<c>~/.afl/**</c>).
+    /// </summary>
+    public string AuthoringWorkspacesDirectory => this.Root.TrimEnd(Path.DirectorySeparatorChar) + PathConstants.AuthoringWorkspacesSuffix;
 
     /// <summary>
     ///     Creates paths for the store at <c>$AFL_HOME</c>, or <c>~/.afl</c> when it isn't set.

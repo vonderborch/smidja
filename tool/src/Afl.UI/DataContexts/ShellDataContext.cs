@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using Afl.Core.Agents;
+using Afl.Core.Authoring;
 using Afl.Core.Helpers;
 using Afl.Core.GitHosts;
 using Afl.Core.Jira;
@@ -53,6 +54,8 @@ public class ShellDataContext : AbstractReloadingDataContext
         this.TicketSources = ticketSources ?? new TicketSourceRegistry { JiraInstances = this.JiraInstances, GitHosts = this.GitHosts };
         this.Driver = new RunDriver(engine ?? new RunEngine(new RunStore(paths)));
         this.Runs = this.Driver.Engine.Store;
+        this.Authoring = new AuthoringService(this.Driver.Engine);
+        this.Authoring.Sessions.EnableChangeNotifications();
         this.Repos.EnableChangeNotifications();
         this.Runs.EnableChangeNotifications();
         this.JiraInstances.EnableChangeNotifications();
@@ -120,6 +123,11 @@ public class ShellDataContext : AbstractReloadingDataContext
     ///     Gets the in-process run driver.
     /// </summary>
     public RunDriver Driver { get; }
+
+    /// <summary>
+    ///     Gets the AI helper that drafts skills, common steps and workflows on hidden runs the driver drives.
+    /// </summary>
+    public AuthoringService Authoring { get; }
 
     /// <summary>
     ///     Gets the sidebar's repo entries, led by <see cref="AllRepos" />.
@@ -228,6 +236,7 @@ public class ShellDataContext : AbstractReloadingDataContext
         this.Driver.StopAll(TimeSpan.FromSeconds(5));
         this.Repos.Dispose();
         this.Runs.Dispose();
+        this.Authoring.Sessions.Dispose();
         this.JiraInstances.Dispose();
         this.Agents.Dispose();
     }

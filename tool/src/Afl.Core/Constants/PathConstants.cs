@@ -106,15 +106,33 @@ public static class PathConstants
     public const string BuiltInSkillResourcePrefix = "skills/";
 
     /// <summary>
-    ///     The directory holding the git worktrees runs work in, under the global store.
+    ///     What's added to the afl home's path to make the directory of the git worktrees runs work in, e.g.
+    ///     <c>~/.afl-worktrees</c>.
     /// </summary>
-    public const string WorktreesDirectoryName = "worktrees";
+    public const string WorktreesSuffix = "-worktrees";
 
     /// <summary>
     ///     The directory holding cached responses from services such as GitHub, under the global store. Anything in it
     ///     can be deleted.
     /// </summary>
     public const string CacheDirectoryName = "cache";
+
+    /// <summary>
+    ///     The directory holding the AI authoring helper's session records, under the global store.
+    /// </summary>
+    public const string AuthoringDirectoryName = "authoring";
+
+    /// <summary>
+    ///     What's added to the afl home's path to make the directory of authoring sessions' work folders, e.g.
+    ///     <c>~/.afl-authoring</c>.
+    /// </summary>
+    public const string AuthoringWorkspacesSuffix = "-authoring";
+
+    /// <summary>
+    ///     The prefix of the embedded resources the AI authoring helper hands its agent: the schemas and the workflow
+    ///     guide.
+    /// </summary>
+    public const string AuthoringResourcePrefix = "authoring/";
 
     /// <summary>
     ///     The file name of a skill's instructions, as agents read them.

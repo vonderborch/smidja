@@ -124,6 +124,23 @@ public class RunEngine(RunStore store, Func<string, AbstractStepExecutor>? execu
     }
 
     /// <summary>
+    ///     Creates and saves an authoring run for the AI authoring helper, without starting it. It is
+    ///     <see cref="RunKind.Authoring" />, so run lists leave it out, and it asks the user before any tool call its
+    ///     workflow doesn't allow (the <c>ask</c> permission policy), whatever the settings' default.
+    /// </summary>
+    /// <param name="repo">Where the run works: the authoring session's folder, as a repo.</param>
+    /// <param name="workflow">The workflow drafting the document.</param>
+    /// <param name="ticket">What to draft, as a ticket.</param>
+    /// <param name="agent">The id of the agent drafting it.</param>
+    /// <returns>The run.</returns>
+    /// <exception cref="AflException">The workflow is invalid, or the agent is unknown or can't do its steps.</exception>
+    public Run CreateAuthoring(RepoRecord repo, WorkflowDefinition workflow, Ticket ticket, string agent)
+    {
+        return this.Create(repo, workflow, ticket, agent, AgentConstants.RunModeBackground, null, null, null, null,
+            new RunChoices(PermissionConstants.PolicyAsk, [], null, RunKind.Authoring));
+    }
+
+    /// <summary>
     ///     Creates and saves a child run for a <c>workflow</c> step, without starting it. It works in the parent's repo,
     ///     working copy and scratch directory, in the parent's mode, and is single-threaded if the parent is.
     /// </summary>
@@ -313,6 +330,14 @@ public class RunEngine(RunStore store, Func<string, AbstractStepExecutor>? execu
                 $"There's no run mode '{mode}'. Use one of {string.Join(", ", RunModeRegistry.Instance.Keys.Order())}.");
         }
 
+        // Only afl's own authoring workflows may use internal step types.
+        List<string> internalSteps = choices.Kind == RunKind.Authoring ? [] : WorkflowLibrary.InternalStepProblems(workflow).ToList();
+        if (internalSteps.Count > 0)
+        {
+            throw new AflException(AflErrorKind.InvalidWorkflow,
+                $"Workflow '{workflow.Id}' is invalid:\n  - {string.Join("\n  - ", internalSteps)}");
+        }
+
         var composer = new WorkflowComposer(new WorkflowLibrary(this.Store.Paths, repo.Path));
         composer.ThrowIfInvalid(workflow);
         var definition = workflow;
@@ -328,6 +353,7 @@ public class RunEngine(RunStore store, Func<string, AbstractStepExecutor>? execu
         var run = new Run
         {
             Id = this.Store.NewId(),
+            Kind = choices.Kind,
             RepoId = repo.Id,
             RepoName = repo.Name,
             RepoPath = repo.Path,
@@ -1881,4 +1907,5 @@ public class RunEngine(RunStore store, Func<string, AbstractStepExecutor>? execu
 /// <param name="Policy">The permission policy name.</param>
 /// <param name="Rules">The run's own permission rules.</param>
 /// <param name="Skills">The skills in place of the workflow's own, or null for the workflow's.</param>
-internal record RunChoices(string Policy, List<PermissionRule> Rules, List<string>? Skills);
+/// <param name="Kind">What the run is to the user.</param>
+internal record RunChoices(string Policy, List<PermissionRule> Rules, List<string>? Skills, RunKind Kind = RunKind.Main);

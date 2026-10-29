@@ -464,7 +464,30 @@
                 <Button Classes="accent" Content="{Binding NewLabel, StringFormat='{}{0}…'}" Click="OnNew" />
                 <Button Content="Duplicate…" Click="OnDuplicate" IsEnabled="{Binding HasDraft}" />
                 <Button Content="Delete…" Click="OnDelete" IsEnabled="{Binding CanDelete}" />
+                <Button Content="New with AI…" Click="OnNewWithAi"
+                        ToolTip.Tip="Describe what you want; an agent researches, asks questions and drafts it for you to approve" />
+                <Button Content="Improve with AI…" Click="OnImproveWithAi" IsEnabled="{Binding CanImprove}"
+                        ToolTip.Tip="Have an agent improve the selected one; a built-in is saved as a copy" />
             </WrapPanel>
+
+            <!-- AI drafts of this kind not yet saved -->
+            <Expander DockPanel.Dock="Bottom" Header="{Binding AiDraftsHeader}" IsVisible="{Binding HasAiDrafts}" IsExpanded="True"
+                      HorizontalAlignment="Stretch" Margin="0,8,0,0">
+                <ListBox x:Name="AiDraftList" ItemsSource="{Binding AiDrafts}" MaxHeight="200" SelectionChanged="OnAiDraftSelected">
+                    <ListBox.ItemTemplate>
+                        <DataTemplate x:DataType="dc:AuthoringRowDataContext">
+                            <DockPanel>
+                                <TextBlock DockPanel.Dock="Right" Classes="needs" Text="needs you" IsVisible="{Binding NeedsYou}"
+                                           VerticalAlignment="Center" />
+                                <StackPanel>
+                                    <TextBlock Text="{Binding Name}" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Classes="meta" Text="{Binding Meta}" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                            </DockPanel>
+                        </DataTemplate>
+                    </ListBox.ItemTemplate>
+                </ListBox>
+            </Expander>
 
             <!-- Search and filters -->
             <StackPanel DockPanel.Dock="Top" Spacing="6" Margin="0,0,0,8">
@@ -489,6 +512,7 @@
                     <ContextMenu>
                         <MenuItem Header="Duplicate…" Click="OnDuplicate" IsEnabled="{Binding HasDraft}" />
                         <MenuItem Header="Copy id" Click="OnCopyListingId" />
+                        <MenuItem Header="Improve with AI…" Click="OnImproveWithAi" IsEnabled="{Binding CanImprove}" />
                         <Separator />
                         <MenuItem Header="Delete…" Click="OnDelete" IsEnabled="{Binding CanDelete}" />
                     </ContextMenu>
@@ -520,11 +544,18 @@
         <Border Grid.Row="1" Grid.Column="1" Margin="6,0,0,0" Classes="card">
             <Panel>
                 <TextBlock Text="Select one or create a new one" Classes="hint" HorizontalAlignment="Center"
-                           VerticalAlignment="Center" IsVisible="{Binding !HasDraft}" />
-                <Grid RowDefinitions="Auto,Auto,*,Auto" IsVisible="{Binding HasDraft}">
+                           VerticalAlignment="Center" IsVisible="{Binding ShowsHint}" />
+                <Panel IsVisible="{Binding HasAuthoring}">
+                    <views:AuthoringSessionView x:Name="AuthoringView" DataContext="{Binding ActiveAuthoring}" />
+                </Panel>
+                <Grid RowDefinitions="Auto,Auto,*,Auto" IsVisible="{Binding ShowsEditor}">
 
                     <!-- Workflow fields -->
                     <StackPanel Grid.Row="0" Spacing="6" Margin="0,0,0,8">
+                    <Border Classes="chip" IsVisible="{Binding IsEditingAiDraft}" HorizontalAlignment="Stretch">
+                        <TextBlock TextWrapping="Wrap"
+                                   Text="Editing an AI draft. Save approves it into the library, replacing one with the same id." />
+                    </Border>
                     <Grid ColumnDefinitions="*,2*" RowDefinitions="Auto,Auto">
                         <HeaderedContentControl Grid.Column="0" Header="Id (file name)" Margin="0,0,8,0">
                             <TextBox Text="{Binding DraftId}" />

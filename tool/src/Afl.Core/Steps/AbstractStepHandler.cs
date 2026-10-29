@@ -34,6 +34,11 @@ public class StepHandlerRegistry() : TypeRegistry<AbstractStepHandler, StepHandl
     private IReadOnlyDictionary<Type, string>? _types;
 
     /// <summary>
+    ///     The step types people can use, built on first use.
+    /// </summary>
+    private IReadOnlyList<string>? _publicKeys;
+
+    /// <summary>
     ///     Gets the shared registry.
     /// </summary>
     public static StepHandlerRegistry Instance { get; } = new();
@@ -48,6 +53,22 @@ public class StepHandlerRegistry() : TypeRegistry<AbstractStepHandler, StepHandl
     ///     Gets the step type of each definition subclass.
     /// </summary>
     private IReadOnlyDictionary<Type, string> Types => this._types ??= this.DefinitionTypes.ToDictionary(p => p.Value, p => p.Key);
+
+    /// <summary>
+    ///     Gets the step types people can use in their own workflows and common steps: every type but the internal ones
+    ///     (<see cref="AbstractStepHandler.IsInternal" />), in order.
+    /// </summary>
+    public IReadOnlyList<string> PublicKeys => this._publicKeys ??= this.Keys.Where(k => !this.Create(k).IsInternal).Order().ToList();
+
+    /// <summary>
+    ///     Returns whether a step type is internal to afl, so people can't use it in their own workflows.
+    /// </summary>
+    /// <param name="type">The step type.</param>
+    /// <returns>Whether it is a known, internal type.</returns>
+    public bool IsInternal(string type)
+    {
+        return this.Contains(type) && !this.PublicKeys.Contains(type, StringComparer.OrdinalIgnoreCase);
+    }
 
     /// <summary>
     ///     Creates the handler for a step.
@@ -150,6 +171,13 @@ public abstract class AbstractStepHandler
     ///     <c>forEach</c>, <c>wait</c>, <c>parallel</c>, <c>reuse</c> and <c>childOutput</c>.
     /// </summary>
     public virtual bool StartsChildRuns => false;
+
+    /// <summary>
+    ///     Gets whether this kind of step is internal to afl: workflows afl builds itself use it (the AI authoring
+    ///     helper's <c>author-draft</c>, for example), but people can't add it to their own workflows or common steps,
+    ///     and the builder doesn't offer it.
+    /// </summary>
+    public virtual bool IsInternal => false;
 
     /// <summary>
     ///     Returns what happens once a step's work is done: its own <see cref="AbstractStepDefinition.Advance" />, or this kind

@@ -4,7 +4,7 @@ using ReactiveUI;
 namespace Afl.UI.DataContexts;
 
 /// <summary>
-///     One refused tool call a step paused on, on the Runs page, with what the user decided about it: allow once,
+///     One refused tool call a step paused on, on the Runs page or an AI draft, with what the user decided about it: allow once,
 ///     always allow (with the rule and where to save it), or deny.
 /// </summary>
 public class PermissionRequestDataContext : ReactiveObject
@@ -13,16 +13,24 @@ public class PermissionRequestDataContext : ReactiveObject
     ///     Initializes a new instance of the <see cref="PermissionRequestDataContext" /> class.
     /// </summary>
     /// <param name="request">The request.</param>
-    public PermissionRequestDataContext(PermissionRequest request)
+    /// <param name="scopes">The scopes an always-allow rule can be saved to, or null for all of them.</param>
+    public PermissionRequestDataContext(PermissionRequest request, IReadOnlyList<PermissionScope>? scopes = null)
     {
         this.Request = request;
         this.Rule = request.Denial.SuggestedRules.FirstOrDefault() ?? request.Denial.Tool;
+        this.ScopeChoices = scopes ?? Scopes;
+        this.Scope = this.ScopeChoices.Contains(PermissionScope.Repo) ? PermissionScope.Repo : this.ScopeChoices[0];
     }
 
     /// <summary>
     ///     Gets the scopes an always-allow rule can be saved to, as shown.
     /// </summary>
     public static IReadOnlyList<PermissionScope> Scopes { get; } = Enum.GetValues<PermissionScope>();
+
+    /// <summary>
+    ///     Gets the scopes this request's always-allow rule can be saved to, as shown: e.g. no repo for an AI draft.
+    /// </summary>
+    public IReadOnlyList<PermissionScope> ScopeChoices { get; }
 
     /// <summary>
     ///     Gets the request.
@@ -64,7 +72,7 @@ public class PermissionRequestDataContext : ReactiveObject
     {
         get;
         set => this.RaiseAndSetIfChanged(ref field, value);
-    } = PermissionScope.Repo;
+    }
 
     /// <summary>
     ///     Gets or sets what the user decided; null while undecided.

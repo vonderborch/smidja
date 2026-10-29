@@ -21,6 +21,12 @@ public static class StepConstants
     public const string TypeUser = "user";
 
     /// <summary>
+    ///     The internal step type the AI authoring helper drafts a document with: an <c>ai</c> step whose output is
+    ///     checked, and sent back to the AI to fix, before the user reviews it.
+    /// </summary>
+    public const string TypeAuthorDraft = "author-draft";
+
+    /// <summary>
     ///     Once the step's work is done the run moves straight on to the next step.
     /// </summary>
     public const string AdvanceAuto = "auto";

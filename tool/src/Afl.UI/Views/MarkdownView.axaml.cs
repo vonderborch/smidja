@@ -1,8 +1,10 @@
+using Afl.UI.Diagrams;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Data;
 using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
+using Markdown.Avalonia.Full;
 using Niddy.Avalonia.Dialogs;
 
 namespace Afl.UI.Views;
@@ -72,6 +74,9 @@ public partial class MarkdownView : UserControl
     public MarkdownView()
     {
         this.InitializeComponent();
+        var plugins = new MdAvPlugins();
+        plugins.Plugins.Add(new DiagramMarkdownPlugin());
+        this.Formatted.Plugins = plugins;
         this.Editor.PropertyChanged += this.OnEditorChanged;
         this.Refresh();
     }

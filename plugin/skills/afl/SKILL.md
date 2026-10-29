@@ -1,7 +1,7 @@
 ---
 name: afl
 description: Run an afl workflow against a GitHub or GitLab issue or a Jira ticket (or resume a run) — this session does the AI steps, the user approves gates. Only runs when the user invokes /afl.
-argument-hint: "[<#issue | PROJ-45 | ticket URL> [--workflow <id>] | --name <work> --workflow <id> | <run id> | runs | issues]"
+argument-hint: "[<#issue | PROJ-45 | ticket URL> [--workflow <id>] | --name <work> --workflow <id> | <run id> | runs | issues | author <skill|step|workflow> <description>]"
 disable-model-invocation: true
 allowed-tools: Bash(afl:*)
 ---
@@ -201,6 +201,33 @@ each `history` entry's `cause` (`replay`, `loop`, `route` or `retry`) and `reaso
 feedback). When a loop reaches its limit the step fails with "Loop limit reached"; show that and offer to replay
 or retry. A step that fails may be retried by afl first (its `retry`) or fail with a timeout; a failure arrow can
 then carry the run on, so a failed step doesn't always mean a failed run: go by the run's status. A step's inputs may decide where the run goes next, so ask them exactly as listed.
+
+## AI drafts: skills, common steps and workflows
+
+When the user asks for a new skill, common step or workflow written by an AI (or `/afl author ...`), afl's own agent
+drafts it in a hidden run; you don't do the drafting, and these runs never show in `afl runs`. Starting one uses the
+user's AI usage, so confirm the description and the kind first.
+
+- Start: `afl author-new <skill|step|workflow> --describe "<their words>" [--repo <id>] [--agent <agent>] --json`, or
+  `afl author-improve <kind> <id> [--describe "..."] --json` for an existing one (a built-in is saved as a copy).
+  Both drive the draft until it needs the user. `afl author-list [--kind k] --json` and `afl author-show <draft> --json`
+  show drafts; read `status` (`working`, `needs-you`, `review`, `failed`, `saved`, `ended`), `check` (the draft's
+  `id`, `name`, `description`, `tags`, `detail` and `problems`), `step` and `next`.
+- `needs-you` with `step.permissionRequests`: the agent was refused something, usually fetching a new site. Show each
+  request's exact URL or command and its suggested rules and **ask** for each: once, always (saved for this draft,
+  `run`, or `global`) or deny. Then `afl author-permit <draft> --once N | --always N[=rule] | --deny N [--scope
+  run|global] --json` (or `--all once|always|deny`, or `--accept-output`).
+- `needs-you` with `step.inputs`: the agent has questions. Put each to the user and send their answers with
+  `afl author-answer <draft> --input <id>="<their answer>" ... --json`.
+- `review`: show the agent's summary (`step.output`), the draft's name, description and tags, and any `problems`
+  (it can't be approved until they're fixed). **Ask** whether to approve and where: `global` (`~/.afl`) or `repo`.
+  Then `afl author-approve <draft> --scope global|repo --json`; if a document with that id already exists there,
+  afl refuses and you **ask** before adding `--overwrite`. For changes: `afl author-changes <draft> --feedback
+  "<their words>" --json`. `failed`: show the error and offer `afl author-retry <draft> --json`. Interrupted
+  (`working` with nothing running): `afl author-resume <draft> --json`.
+- `afl author-discard <draft> --json` deletes the draft's run and folder; only when the user asks.
+- Never approve a draft, pick its scope, overwrite, answer its questions, or grant or deny its permission requests
+  without the user's explicit yes.
 
 ## Rules
 

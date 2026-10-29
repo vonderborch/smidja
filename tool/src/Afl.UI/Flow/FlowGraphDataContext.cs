@@ -251,10 +251,10 @@ public class FlowGraphDataContext : ReactiveObject
     public double ColumnWidth { get; private set; } = NodeWidth;
 
     /// <summary>
-    ///     Gets the new steps the Add step menu offers, one per registered step type.
+    ///     Gets the new steps the Add step menu offers, one per step type people can use.
     /// </summary>
     public IReadOnlyList<StepTypePaletteItem> StepTypes { get; } =
-        StepHandlerRegistry.Instance.Keys.Order(StringComparer.Ordinal).Select(t => new StepTypePaletteItem(t)).ToList();
+        StepHandlerRegistry.Instance.PublicKeys.Order(StringComparer.Ordinal).Select(t => new StepTypePaletteItem(t)).ToList();
 
     /// <summary>
     ///     Gets whether there are common steps to pick from.
